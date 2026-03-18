@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sheet, 
   SheetContent, 
@@ -27,12 +27,16 @@ import {
   Trash2, 
   X,
   Loader2,
-  Plus
+  Plus,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { generateTaskDescription } from '@/ai/flows/ai-task-description-generation';
 import { suggestTaskAttributes } from '@/ai/flows/ai-task-attribute-suggestion';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 export function TaskDetailPanel({ 
   taskId, 
@@ -46,9 +50,16 @@ export function TaskDetailPanel({
   store: any
 }) {
   const task = store.tasks?.find((t: any) => t.id === taskId);
+  const comments = store.getTaskComments(taskId);
   const { toast } = useToast();
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [isSuggestingAttrs, setIsSuggestingAttrs] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!task) return null;
 
@@ -86,6 +97,13 @@ export function TaskDetailPanel({
   const handleDelete = () => {
     store.deleteTask(taskId);
     onClose();
+  };
+
+  const handlePostComment = () => {
+    if (newComment.trim()) {
+      store.addComment(taskId, newComment.trim());
+      setNewComment('');
+    }
   };
 
   return (
@@ -173,7 +191,10 @@ export function TaskDetailPanel({
                   {store.workspaceMembers.map((m: any) => (
                     <SelectItem key={m.userId} value={m.userId}>
                       <div className="flex items-center gap-2">
-                        <UserIcon className="h-3 w-3" />
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={m.avatarUrl} />
+                          <AvatarFallback>{m.displayName.charAt(0)}</AvatarFallback>
+                        </Avatar>
                         {m.displayName}
                       </div>
                     </SelectItem>
@@ -201,7 +222,7 @@ export function TaskDetailPanel({
             </div>
             <Textarea 
               placeholder="Add details about this task..."
-              className="min-h-[150px] leading-relaxed resize-none"
+              className="min-h-[120px] leading-relaxed resize-none"
               value={task.description}
               onChange={(e) => handleUpdate('description', e.target.value)}
             />
@@ -224,6 +245,77 @@ export function TaskDetailPanel({
               <Button variant="ghost" size="sm" className="h-7 px-2 border border-dashed rounded-full text-xs">
                 <Plus className="h-3 w-3 mr-1" /> Add Tag
               </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Comments Section */}
+          <div className="space-y-6">
+            <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3" /> Comments ({comments.length})
+            </Label>
+
+            <div className="space-y-4">
+              {comments.map((comment: any) => {
+                const author = store.workspaceMembers.find((m: any) => m.userId === comment.authorUserId);
+                return (
+                  <div key={comment.id} className="flex gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={author?.avatarUrl} />
+                      <AvatarFallback>{author?.displayName.charAt(0) || '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold">{author?.displayName || 'Unknown User'}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {mounted ? new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
+                        </span>
+                      </div>
+                      <div className="text-sm bg-muted/40 p-3 rounded-lg border border-transparent hover:border-border transition-colors">
+                        {comment.body}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {comments.length === 0 && (
+                <div className="text-center py-6 text-sm text-muted-foreground italic">
+                  No comments yet. Start the conversation!
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-start gap-3 pt-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={store.currentUser.avatarUrl} />
+                <AvatarFallback>{store.currentUser.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <Textarea 
+                  placeholder="Write a comment..."
+                  className="min-h-[80px] text-sm"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handlePostComment();
+                    }
+                  }}
+                />
+                <div className="flex justify-end">
+                  <Button 
+                    size="sm" 
+                    className="gap-2 h-8"
+                    onClick={handlePostComment}
+                    disabled={!newComment.trim()}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Comment
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { User, Workspace, WorkspaceMember, Project, Task, Status, Priority } from './types';
+import { User, Workspace, WorkspaceMember, Project, Task, Status, Priority, Comment } from './types';
 
 export const currentUser: User = {
   id: 'u1',
@@ -85,7 +85,7 @@ export const mockTasks: Task[] = [
     description: 'Check accessibility contrast for the new palette.',
     status: 'todo',
     priority: 'medium',
-    dueDate: '2024-12-20T17:00:00.000Z',
+    dueDate: '2025-12-20T17:00:00.000Z',
     assigneeUserId: 'u1',
     tags: ['UI', 'A11y'],
     createdAt: '2025-01-12T15:00:00.000Z',
@@ -105,4 +105,21 @@ export const mockTasks: Task[] = [
     createdAt: '2025-01-15T09:00:00.000Z',
     updatedAt: '2025-01-15T09:00:00.000Z',
   },
+];
+
+export const mockComments: Comment[] = [
+  {
+    id: 'c1',
+    taskId: 't1',
+    authorUserId: 'u2',
+    body: 'I think we should stick to the tab bar for better visibility.',
+    createdAt: '2025-01-11T10:00:00.000Z',
+  },
+  {
+    id: 'c2',
+    taskId: 't1',
+    authorUserId: 'u1',
+    body: 'Agreed. Let\'s prototype that first.',
+    createdAt: '2025-01-11T14:30:00.000Z',
+  }
 ];

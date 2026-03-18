@@ -6,9 +6,10 @@ import {
   mockProjects, 
   mockTasks, 
   mockWorkspaceMembers, 
+  mockComments,
   currentUser 
 } from '@/lib/mock-data';
-import { Workspace, Project, Task, WorkspaceMember } from '@/lib/types';
+import { Workspace, Project, Task, WorkspaceMember, Comment } from '@/lib/types';
 
 export function useNexusStore() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(mockWorkspaces);
@@ -16,6 +17,7 @@ export function useNexusStore() {
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [members, setMembers] = useState<WorkspaceMember[]>(mockWorkspaceMembers);
+  const [comments, setComments] = useState<Comment[]>(mockComments);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
@@ -63,6 +65,12 @@ export function useNexusStore() {
     members.filter(m => m.workspaceId === activeWorkspaceId),
     [members, activeWorkspaceId]
   );
+
+  const getTaskComments = useCallback((taskId: string) => {
+    return comments
+      .filter(c => c.taskId === taskId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [comments]);
 
   // Actions
   const switchWorkspace = useCallback((id: string) => {
@@ -153,6 +161,17 @@ export function useNexusStore() {
     setMembers(prev => [...prev, newMember]);
   }, [activeWorkspaceId]);
 
+  const addComment = useCallback((taskId: string, body: string) => {
+    const newComment: Comment = {
+      id: Math.random().toString(36).substring(2, 11),
+      taskId,
+      authorUserId: currentUser.id,
+      body,
+      createdAt: new Date().toISOString(),
+    };
+    setComments(prev => [...prev, newComment]);
+  }, []);
+
   return {
     currentUser,
     workspaces,
@@ -176,5 +195,7 @@ export function useNexusStore() {
     updateTask,
     deleteTask,
     addMockMember,
+    getTaskComments,
+    addComment,
   };
 }
