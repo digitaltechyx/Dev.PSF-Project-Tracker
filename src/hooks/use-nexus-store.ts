@@ -34,32 +34,30 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
+  const filterTasks = useCallback((taskList: Task[], query: string) => {
+    if (!query) return taskList;
+    const lowerQuery = query.toLowerCase();
+    return taskList.filter(t => 
+      t.title.toLowerCase().includes(lowerQuery) ||
+      (t.description && t.description.toLowerCase().includes(lowerQuery)) ||
+      (t.tags && t.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))
+    );
+  }, []);
+
   const workspaceTasks = useMemo(() => {
     const wsTasks = tasks.filter(t => t.workspaceId === activeWorkspaceId);
-    if (!globalSearchQuery) return wsTasks;
-    return wsTasks.filter(t => 
-      t.title.toLowerCase().includes(globalSearchQuery.toLowerCase()) ||
-      t.description.toLowerCase().includes(globalSearchQuery.toLowerCase())
-    );
-  }, [tasks, activeWorkspaceId, globalSearchQuery]);
+    return filterTasks(wsTasks, globalSearchQuery);
+  }, [tasks, activeWorkspaceId, globalSearchQuery, filterTasks]);
 
   const projectTasks = useMemo(() => {
     const pTasks = activeProjectId ? tasks.filter(t => t.projectId === activeProjectId) : [];
-    if (!globalSearchQuery) return pTasks;
-    return pTasks.filter(t => 
-      t.title.toLowerCase().includes(globalSearchQuery.toLowerCase()) ||
-      t.description.toLowerCase().includes(globalSearchQuery.toLowerCase())
-    );
-  }, [tasks, activeProjectId, globalSearchQuery]);
+    return filterTasks(pTasks, globalSearchQuery);
+  }, [tasks, activeProjectId, globalSearchQuery, filterTasks]);
 
   const myTasks = useMemo(() => {
     const mTasks = tasks.filter(t => t.assigneeUserId === currentUser.id);
-    if (!globalSearchQuery) return mTasks;
-    return mTasks.filter(t => 
-      t.title.toLowerCase().includes(globalSearchQuery.toLowerCase()) ||
-      t.description.toLowerCase().includes(globalSearchQuery.toLowerCase())
-    );
-  }, [tasks, globalSearchQuery]);
+    return filterTasks(mTasks, globalSearchQuery);
+  }, [tasks, globalSearchQuery, filterTasks]);
 
   const workspaceMembers = useMemo(() => 
     members.filter(m => m.workspaceId === activeWorkspaceId),
@@ -81,7 +79,7 @@ export function useNexusStore() {
       id: Math.random().toString(36).substr(2, 9),
       name,
       description,
-      color: '#' + Math.floor(Math.random()*16777215).toString(16),
+      color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
       ownerUserId: currentUser.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -98,7 +96,7 @@ export function useNexusStore() {
       workspaceId: activeWorkspaceId,
       name,
       description,
-      color: '#' + Math.floor(Math.random()*16777215).toString(16),
+      color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
