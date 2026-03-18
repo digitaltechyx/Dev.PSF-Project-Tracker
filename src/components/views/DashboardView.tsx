@@ -1,13 +1,12 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   FolderKanban, 
   CheckCircle2, 
   Clock, 
   AlertCircle,
-  TrendingUp,
   CalendarDays
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +14,11 @@ import { Progress } from '@/components/ui/progress';
 
 export function DashboardView({ store }: { store: any }) {
   const { workspaceTasks, workspaceProjects, activeWorkspace } = store;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const stats = {
     totalProjects: workspaceProjects.length,
@@ -50,7 +54,9 @@ export function DashboardView({ store }: { store: any }) {
             <div className="text-2xl font-bold">{stats.totalTasks}</div>
             <div className="mt-2">
               <Progress value={completionRate} className="h-1.5" />
-              <p className="text-[10px] text-muted-foreground mt-1">{Math.round(completionRate)}% completed</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {mounted ? Math.round(completionRate) : '0'}% completed
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -70,7 +76,7 @@ export function DashboardView({ store }: { store: any }) {
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.overdue + stats.urgent}</div>
+            <div className="text-2xl font-bold">{mounted ? stats.overdue + stats.urgent : '...'}</div>
             <p className="text-xs text-muted-foreground mt-1">Overdue or Urgent</p>
           </CardContent>
         </Card>
@@ -107,7 +113,7 @@ export function DashboardView({ store }: { store: any }) {
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {new Date(task.updatedAt).toLocaleDateString()}
+                    {mounted ? new Date(task.updatedAt).toLocaleDateString() : '...'}
                   </div>
                 </div>
               ))}

@@ -1,10 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Task, Status, Priority } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { MoreHorizontal, Plus, Clock, CheckCircle2 } from 'lucide-react';
+import { MoreHorizontal, Plus, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -30,6 +30,12 @@ export function KanbanBoard({
   onTaskClick: (id: string) => void,
   updateTask: any
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-[500px]">
       {columns.map(col => {
@@ -83,12 +89,13 @@ export function KanbanBoard({
 
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
-                        {task.dueDate && (
+                        {mounted && task.dueDate && (
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                           </div>
                         )}
+                        {!mounted && task.dueDate && <div className="h-3 w-8 bg-muted animate-pulse rounded" />}
                       </div>
                       <div className="flex -space-x-2">
                         <div className="w-5 h-5 rounded-full bg-primary/10 border-2 border-background" />

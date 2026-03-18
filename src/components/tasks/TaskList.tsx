@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -14,18 +14,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Task, Priority, Status } from '@/lib/types';
 import { 
-  AlertCircle, 
   Clock, 
   CheckCircle2, 
   MoreVertical 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 
 const priorityColors: Record<Priority, string> = {
   low: 'bg-slate-100 text-slate-700',
@@ -49,6 +42,12 @@ export function TaskList({
   onTaskClick: (id: string) => void,
   updateTask: any
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="bg-card rounded-lg border overflow-hidden shadow-sm">
       <Table>
@@ -108,7 +107,7 @@ export function TaskList({
                 </Badge>
               </TableCell>
               <TableCell className="text-muted-foreground text-xs">
-                {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No date'}
+                {mounted && task.dueDate ? new Date(task.dueDate).toLocaleDateString() : (task.dueDate ? '...' : 'No date')}
               </TableCell>
               <TableCell className="text-right">
                 <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
