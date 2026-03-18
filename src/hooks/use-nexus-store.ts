@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { 
   mockWorkspaces, 
   mockProjects, 
@@ -8,7 +8,7 @@ import {
   mockWorkspaceMembers, 
   currentUser 
 } from '@/lib/mock-data';
-import { Workspace, Project, Task, Status, Priority, WorkspaceMember, User } from '@/lib/types';
+import { Workspace, Project, Task, WorkspaceMember } from '@/lib/types';
 
 export function useNexusStore() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(mockWorkspaces);
@@ -43,6 +43,11 @@ export function useNexusStore() {
     [tasks, activeProjectId]
   );
 
+  const myTasks = useMemo(() => 
+    tasks.filter(t => t.assigneeUserId === currentUser.id),
+    [tasks]
+  );
+
   const workspaceMembers = useMemo(() => 
     members.filter(m => m.workspaceId === activeWorkspaceId),
     [members, activeWorkspaceId]
@@ -51,7 +56,7 @@ export function useNexusStore() {
   // Actions
   const switchWorkspace = useCallback((id: string) => {
     setActiveWorkspaceId(id);
-    setActiveProjectId(null); // Reset project view when switching workspaces
+    setActiveProjectId(null); 
   }, []);
 
   const selectProject = useCallback((id: string | null) => {
@@ -127,6 +132,7 @@ export function useNexusStore() {
     tasks,
     workspaceTasks,
     projectTasks,
+    myTasks,
     workspaceMembers,
     switchWorkspace,
     selectProject,

@@ -3,15 +3,14 @@
 import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
-  FolderKanban, 
   Users, 
   Search, 
   Settings, 
   Plus, 
   ChevronDown,
-  ChevronRight,
-  Hash,
-  Box
+  Box,
+  ListTodo,
+  Bell
 } from 'lucide-react';
 import { useNexusStore } from '@/hooks/use-nexus-store';
 import { Button } from '@/components/ui/button';
@@ -25,27 +24,26 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 import { DashboardView } from './views/DashboardView';
 import { ProjectView } from './views/ProjectView';
 import { MembersView } from './views/MembersView';
+import { MyTasksView } from './views/MyTasksView';
+import { NotificationsView } from './views/NotificationsView';
+
+type ViewType = 'dashboard' | 'project' | 'members' | 'my-tasks' | 'notifications';
 
 export function NexusShell() {
   const store = useNexusStore();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'project' | 'members'>('dashboard');
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
 
   const handleProjectClick = (id: string) => {
     store.selectProject(id);
     setCurrentView('project');
   };
 
-  const handleDashboardClick = () => {
-    store.selectProject(null);
-    setCurrentView('dashboard');
-  };
-
-  const handleMembersClick = () => {
-    setCurrentView('members');
+  const handleNavClick = (view: ViewType) => {
+    if (view !== 'project') store.selectProject(null);
+    setCurrentView(view);
   };
 
   return (
@@ -95,15 +93,31 @@ export function NexusShell() {
             <Button 
               variant={currentView === 'dashboard' ? 'secondary' : 'ghost'} 
               className="w-full justify-start gap-3"
-              onClick={handleDashboardClick}
+              onClick={() => handleNavClick('dashboard')}
             >
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
             </Button>
             <Button 
+              variant={currentView === 'my-tasks' ? 'secondary' : 'ghost'} 
+              className="w-full justify-start gap-3"
+              onClick={() => handleNavClick('my-tasks')}
+            >
+              <ListTodo className="h-4 w-4" />
+              My Tasks
+            </Button>
+            <Button 
+              variant={currentView === 'notifications' ? 'secondary' : 'ghost'} 
+              className="w-full justify-start gap-3"
+              onClick={() => handleNavClick('notifications')}
+            >
+              <Bell className="h-4 w-4" />
+              Notifications
+            </Button>
+            <Button 
               variant={currentView === 'members' ? 'secondary' : 'ghost'} 
               className="w-full justify-start gap-3"
-              onClick={handleMembersClick}
+              onClick={() => handleNavClick('members')}
             >
               <Users className="h-4 w-4" />
               Members
@@ -121,7 +135,7 @@ export function NexusShell() {
               {store.workspaceProjects.map(p => (
                 <Button 
                   key={p.id} 
-                  variant={store.activeProject?.id === p.id ? 'secondary' : 'ghost'} 
+                  variant={store.activeProject?.id === p.id && currentView === 'project' ? 'secondary' : 'ghost'} 
                   className="w-full justify-start gap-3 font-normal"
                   onClick={() => handleProjectClick(p.id)}
                 >
@@ -159,6 +173,8 @@ export function NexusShell() {
             <h1 className="text-xl font-bold font-headline">
               {currentView === 'dashboard' ? 'Workspace Overview' : 
                currentView === 'members' ? 'Team Members' : 
+               currentView === 'my-tasks' ? 'Personal Taskboard' :
+               currentView === 'notifications' ? 'Activity Feed' :
                store.activeProject?.name || 'Project'}
             </h1>
           </div>
@@ -177,6 +193,8 @@ export function NexusShell() {
           {currentView === 'dashboard' && <DashboardView store={store} />}
           {currentView === 'project' && <ProjectView store={store} />}
           {currentView === 'members' && <MembersView store={store} />}
+          {currentView === 'my-tasks' && <MyTasksView store={store} />}
+          {currentView === 'notifications' && <NotificationsView store={store} />}
         </main>
       </div>
     </div>
