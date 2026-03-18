@@ -5,8 +5,10 @@ import {
   LayoutList, 
   Kanban, 
   Plus, 
-  Search,
-  MoreHorizontal
+  MoreHorizontal,
+  Calendar,
+  User as UserIcon,
+  Tag as TagIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,29 +21,59 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { Status, Priority } from '@/lib/types';
 
 export function ProjectView({ store }: { store: any }) {
   const [view, setView] = useState<'list' | 'kanban'>('list');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
 
+  // Form State
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDesc, setNewTaskDesc] = useState('');
+  const [newTaskStatus, setNewTaskStatus] = useState<Status>('todo');
+  const [newTaskPriority, setNewTaskPriority] = useState<Priority>('medium');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskTags, setNewTaskTags] = useState('');
 
   const activeProject = store.activeProject;
-  
-  // Use globally filtered tasks from the store
   const filteredTasks = store.projectTasks;
 
   const handleCreateTask = () => {
     if (newTaskTitle && activeProject) {
-      store.createTask(activeProject.id, newTaskTitle, newTaskDesc);
+      const tagsArray = newTaskTags.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+      
+      store.createTask(activeProject.id, {
+        title: newTaskTitle,
+        description: newTaskDesc,
+        status: newTaskStatus,
+        priority: newTaskPriority,
+        dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined,
+        assigneeUserId: newTaskAssignee || undefined,
+        tags: tagsArray,
+      });
+
+      // Reset Form
       setNewTaskTitle('');
       setNewTaskDesc('');
+      setNewTaskStatus('todo');
+      setNewTaskPriority('medium');
+      setNewTaskDueDate('');
+      setNewTaskAssignee('');
+      setNewTaskTags('');
       setIsCreateTaskOpen(false);
     }
   };
@@ -80,26 +112,105 @@ export function ProjectView({ store }: { store: any }) {
                 Add Task
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Task</DialogTitle>
+                <DialogDescription>Add a new task to {activeProject.name}.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-6 py-4">
                 <div className="space-y-2">
-                  <Label>Task Title</Label>
+                  <Label htmlFor="task-title">Task Title</Label>
                   <Input 
+                    id="task-title"
                     placeholder="E.g. Design homepage hero" 
                     value={newTaskTitle} 
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                   />
                 </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={newTaskStatus} onValueChange={(val: Status) => setNewTaskStatus(val)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todo">To Do</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="done">Done</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={newTaskPriority} onValueChange={(val: Priority) => setNewTaskPriority(val)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        type="date" 
+                        className="pl-9" 
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assignee</Label>
+                    <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {store.workspaceMembers.map((m: any) => (
+                          <SelectItem key={m.userId} value={m.userId}>
+                            <div className="flex items-center gap-2">
+                              <UserIcon className="h-3 w-3" />
+                              {m.displayName}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Description</Label>
+                  <Label htmlFor="task-desc">Description</Label>
                   <Textarea 
+                    id="task-desc"
                     placeholder="What needs to be done?" 
                     value={newTaskDesc}
                     onChange={(e) => setNewTaskDesc(e.target.value)}
-                    rows={4}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="task-tags" className="flex items-center gap-1.5">
+                    <TagIcon className="h-3 w-3" /> Tags
+                  </Label>
+                  <Input 
+                    id="task-tags"
+                    placeholder="E.g. Design, Frontend, Urgernt (comma separated)" 
+                    value={newTaskTags}
+                    onChange={(e) => setNewTaskTags(e.target.value)}
                   />
                 </div>
               </div>

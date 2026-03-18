@@ -114,15 +114,18 @@ export function useNexusStore() {
     if (activeProjectId === id) setActiveProjectId(null);
   }, [activeProjectId]);
 
-  const createTask = useCallback((projectId: string, title: string, description: string) => {
+  const createTask = useCallback((projectId: string, taskData: Partial<Task>) => {
     const newTask: Task = {
       id: Math.random().toString(36).substring(2, 11),
       workspaceId: activeWorkspaceId,
       projectId,
-      title,
-      description,
-      status: 'todo',
-      priority: 'medium',
+      title: taskData.title || 'Untitled Task',
+      description: taskData.description || '',
+      status: taskData.status || 'todo',
+      priority: taskData.priority || 'medium',
+      dueDate: taskData.dueDate,
+      assigneeUserId: taskData.assigneeUserId,
+      tags: taskData.tags || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
