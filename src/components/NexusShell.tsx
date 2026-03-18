@@ -29,7 +29,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -124,7 +125,10 @@ export function NexusShell() {
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 className="text-primary font-medium cursor-pointer"
-                onSelect={() => setIsWsDialogOpen(true)}
+                onSelect={(e) => {
+                  e.preventDefault(); // Critical to prevent focus lock glitch
+                  setIsWsDialogOpen(true);
+                }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Workspace
@@ -253,74 +257,72 @@ export function NexusShell() {
         </main>
       </div>
 
-      {/* Dialogs - Conditional rendering to prevent hydration/lifecycle issues */}
-      {isWsDialogOpen && (
-        <Dialog open={isWsDialogOpen} onOpenChange={setIsWsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Workspace</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="ws-name">Workspace Name</Label>
-                <Input 
-                  id="ws-name"
-                  placeholder="e.g. Design Team" 
-                  value={newWsName}
-                  onChange={(e) => setNewWsName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ws-desc">Description</Label>
-                <Textarea 
-                  id="ws-desc"
-                  placeholder="What is this workspace for?" 
-                  value={newWsDesc}
-                  onChange={(e) => setNewWsDesc(e.target.value)}
-                />
-              </div>
+      {/* Global Dialogs */}
+      <Dialog open={isWsDialogOpen} onOpenChange={setIsWsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Workspace</DialogTitle>
+            <DialogDescription>Start a new collaborative workspace for your team.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="ws-name">Workspace Name</Label>
+              <Input 
+                id="ws-name"
+                placeholder="e.g. Design Team" 
+                value={newWsName}
+                onChange={(e) => setNewWsName(e.target.value)}
+              />
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsWsDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateWorkspace}>Create Workspace</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            <div className="space-y-2">
+              <Label htmlFor="ws-desc">Description</Label>
+              <Textarea 
+                id="ws-desc"
+                placeholder="What is this workspace for?" 
+                value={newWsDesc}
+                onChange={(e) => setNewWsDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWsDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateWorkspace}>Create Workspace</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {isProjDialogOpen && (
-        <Dialog open={isProjDialogOpen} onOpenChange={setIsProjDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="proj-name">Project Name</Label>
-                <Input 
-                  id="proj-name"
-                  placeholder="e.g. Website Launch" 
-                  value={newProjName}
-                  onChange={(e) => setNewProjName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="proj-desc">Description</Label>
-                <Textarea 
-                  id="proj-desc"
-                  placeholder="Project goals and scope..." 
-                  value={newProjDesc}
-                  onChange={(e) => setNewProjDesc(e.target.value)}
-                />
-              </div>
+      <Dialog open={isProjDialogOpen} onOpenChange={setIsProjDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>Create a project to organize tasks in {store.activeWorkspace.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="proj-name">Project Name</Label>
+              <Input 
+                id="proj-name"
+                placeholder="e.g. Website Launch" 
+                value={newProjName}
+                onChange={(e) => setNewProjName(e.target.value)}
+              />
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsProjDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateProject}>Create Project</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            <div className="space-y-2">
+              <Label htmlFor="proj-desc">Description</Label>
+              <Textarea 
+                id="proj-desc"
+                placeholder="Project goals and scope..." 
+                value={newProjDesc}
+                onChange={(e) => setNewProjDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsProjDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateProject}>Create Project</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
