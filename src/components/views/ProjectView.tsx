@@ -5,7 +5,6 @@ import {
   LayoutList, 
   Kanban, 
   Plus, 
-  MoreHorizontal,
   Calendar,
   User as UserIcon,
   Tag as TagIcon
@@ -78,6 +77,11 @@ export function ProjectView({ store }: { store: any }) {
     }
   };
 
+  const openCreateTaskWithStatus = (status: Status) => {
+    setNewTaskStatus(status);
+    setIsCreateTaskOpen(true);
+  };
+
   if (!activeProject) return null;
 
   return (
@@ -107,7 +111,7 @@ export function ProjectView({ store }: { store: any }) {
         <div className="flex items-center gap-2">
           <Dialog open={isCreateTaskOpen} onOpenChange={setIsCreateTaskOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gap-2 h-8">
+              <Button size="sm" className="gap-2 h-8" onClick={() => setNewTaskStatus('todo')}>
                 <Plus className="h-4 w-4" />
                 Add Task
               </Button>
@@ -220,10 +224,6 @@ export function ProjectView({ store }: { store: any }) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          
-          <Button variant="outline" size="icon" className="h-8 w-8">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
@@ -239,6 +239,7 @@ export function ProjectView({ store }: { store: any }) {
             tasks={filteredTasks} 
             onTaskClick={(id) => setSelectedTaskId(id)} 
             updateTask={store.updateTask}
+            onAddTask={openCreateTaskWithStatus}
           />
         )}
       </div>

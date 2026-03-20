@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Task, Status, Priority } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { MoreHorizontal, Plus, Clock } from 'lucide-react';
+import { Plus, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -24,11 +24,13 @@ const priorityBorder: Record<Priority, string> = {
 export function KanbanBoard({ 
   tasks, 
   onTaskClick, 
-  updateTask 
+  updateTask,
+  onAddTask
 }: { 
   tasks: Task[], 
   onTaskClick: (id: string) => void,
-  updateTask: any
+  updateTask: any,
+  onAddTask?: (status: Status) => void
 }) {
   const [mounted, setMounted] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -108,8 +110,14 @@ export function KanbanBoard({
                 <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{columnTasks.length}</Badge>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7"><Plus className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  onClick={() => onAddTask?.(col.id)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
