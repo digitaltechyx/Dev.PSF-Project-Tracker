@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
-export function DashboardView({ store }: { store: any }) {
+export function DashboardView({ store, onNavigateToProject }: { store: any, onNavigateToProject: (id: string) => void }) {
   const { workspaceTasks, workspaceProjects, activeWorkspace } = store;
   const [mounted, setMounted] = useState(false);
 
@@ -107,7 +107,10 @@ export function DashboardView({ store }: { store: any }) {
                         {task.priority}
                       </Badge>
                       <span className="text-xs text-muted-foreground">in project</span>
-                      <span className="text-xs font-medium underline cursor-pointer">
+                      <span 
+                        className="text-xs font-medium underline cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => onNavigateToProject(task.projectId)}
+                      >
                         {workspaceProjects.find((p: any) => p.id === task.projectId)?.name}
                       </span>
                     </div>
@@ -139,9 +142,13 @@ export function DashboardView({ store }: { store: any }) {
                 const progress = total > 0 ? (done / total) * 100 : 0;
                 
                 return (
-                  <div key={project.id} className="space-y-2">
+                  <div 
+                    key={project.id} 
+                    className="space-y-2 cursor-pointer group"
+                    onClick={() => onNavigateToProject(project.id)}
+                  >
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{project.name}</span>
+                      <span className="text-sm font-medium group-hover:text-primary transition-colors">{project.name}</span>
                       <span className="text-xs text-muted-foreground">{done}/{total}</span>
                     </div>
                     <Progress value={progress} className="h-1.5" />

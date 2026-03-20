@@ -5,7 +5,6 @@ import {
   LayoutDashboard, 
   Users, 
   Search, 
-  Settings, 
   Plus, 
   ChevronDown,
   Box,
@@ -19,8 +18,7 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -128,7 +126,10 @@ export function NexusShell() {
             variant="ghost" 
             size="icon" 
             className="h-8 w-8 text-muted-foreground hover:text-primary flex-shrink-0"
-            onClick={() => setIsWsDialogOpen(true)}
+            onClick={(e) => {
+              e.preventDefault();
+              setIsWsDialogOpen(true);
+            }}
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -239,14 +240,11 @@ export function NexusShell() {
                 onChange={(e) => store.setGlobalSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <Settings className="h-5 w-5" />
-            </Button>
           </div>
         </header>
 
         <main className="flex-1 overflow-auto bg-background p-6">
-          {currentView === 'dashboard' && <DashboardView store={store} />}
+          {currentView === 'dashboard' && <DashboardView store={store} onNavigateToProject={handleProjectClick} />}
           {currentView === 'project' && <ProjectView store={store} />}
           {currentView === 'members' && <MembersView store={store} />}
           {currentView === 'my-tasks' && <MyTasksView store={store} />}
