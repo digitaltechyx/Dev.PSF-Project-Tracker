@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sheet, 
   SheetContent, 
@@ -61,12 +60,21 @@ export function TaskDetailPanel({
     setMounted(true);
   }, []);
 
-  // Look for the task in the store's task list
-  const task = store.tasks?.find((t: any) => t.id === taskId);
+  // Robust task lookup: Check all potential sources in the store
+  const task = useMemo(() => {
+    if (!taskId) return null;
+    return (
+      store.projectTasks?.find((t: any) => t.id === taskId) || 
+      store.myTasks?.find((t: any) => t.id === taskId) ||
+      store.workspaceTasks?.find((t: any) => t.id === taskId) ||
+      store.tasks?.find((t: any) => t.id === taskId)
+    );
+  }, [taskId, store.projectTasks, store.myTasks, store.workspaceTasks, store.tasks]);
 
   // Real-time comments listener
   const commentsQuery = useMemoFirebase(() => {
     if (!db || !task || !user) return null;
+    // Comments use hierarchical structure
     return query(
       collection(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', task.id, 'comments'),
       where(`memberRoles.${user.uid}`, '>=', ''),
@@ -192,7 +200,7 @@ export function TaskDetailPanel({
                   type="date" 
                   className="pl-9 h-9" 
                   value={task.dueDate ? task.dueDate.split('T')[0] : ''}
-                  onChange={(e) => handleUpdate('dueDate', new Date(e.target.value).toISOString())}
+                  onChange={(e) => handleUpdate('dueDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
                 />
               </div>
             </div>
@@ -205,7 +213,7 @@ export function TaskDetailPanel({
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
                   {store.workspaceMembers.map((m: any) => (
-                    <SelectItem key={m.id} value={m.userId}>
+                    <SelectItem key={m.userId} value={m.userId}>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-5 w-5">
                           <AvatarImage src={m.avatarUrl} />

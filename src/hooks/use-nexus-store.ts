@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -221,6 +220,7 @@ export function useNexusStore() {
   const updateTask = useCallback((taskId: string, data: Partial<Task>) => {
     if (!db) return;
     
+    // Find task in project tasks first, then global tasks
     const task = activeProjectTasks.find(t => t.id === taskId) || globalTasks.find(t => t.id === taskId);
     
     if (!task) return;
@@ -287,7 +287,7 @@ export function useNexusStore() {
     workspaceTasks,
     projectTasks,
     myTasks,
-    tasks: globalTasks, // Expose raw globalTasks for details panel lookup
+    tasks: globalTasks, 
     workspaceMembers: members,
     workspaceNotifications: [],
     globalSearchQuery,
