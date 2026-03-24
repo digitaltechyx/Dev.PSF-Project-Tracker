@@ -66,7 +66,7 @@ export function TaskDetailPanel({
     if (!db || !task || !user) return null;
     return query(
       collection(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', task.id, 'comments'),
-      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member']),
+      where(`memberRoles.${user.uid}`, '>=', ''),
       orderBy('createdAt', 'asc')
     );
   }, [db, task, user]);

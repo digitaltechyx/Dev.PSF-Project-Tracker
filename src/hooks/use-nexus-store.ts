@@ -15,7 +15,8 @@ import {
   query, 
   where, 
   doc, 
-  collectionGroup
+  collectionGroup,
+  orderBy
 } from 'firebase/firestore';
 import { Workspace, Project, Task, WorkspaceMember, Notification } from '@/lib/types';
 
@@ -31,7 +32,7 @@ export function useNexusStore() {
     if (!db || !user) return null;
     return query(
       collection(db, 'workspaces'),
-      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
+      where(`memberRoles.${user.uid}`, '>=', '') // Checks if key exists by value range
     );
   }, [db, user]);
   
@@ -58,7 +59,7 @@ export function useNexusStore() {
     if (!db || !activeWorkspace || !user) return null;
     return query(
       collection(db, 'workspaces', activeWorkspace.id, 'projects'),
-      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
+      where(`memberRoles.${user.uid}`, '>=', '')
     );
   }, [db, activeWorkspace, user]);
   
@@ -76,7 +77,7 @@ export function useNexusStore() {
     return query(
       collectionGroup(db, 'tasks'),
       where('workspaceId', '==', activeWorkspace.id),
-      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
+      where(`memberRoles.${user.uid}`, '>=', '')
     );
   }, [db, activeWorkspace, user]);
   
@@ -88,7 +89,7 @@ export function useNexusStore() {
     if (!db || !activeWorkspace || !user) return null;
     return query(
       collection(db, 'workspaces', activeWorkspace.id, 'members'),
-      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
+      where(`memberRoles.${user.uid}`, '>=', '')
     );
   }, [db, activeWorkspace, user]);
   

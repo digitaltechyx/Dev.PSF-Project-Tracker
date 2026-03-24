@@ -26,11 +26,16 @@ service cloud.firestore {
     }
 
     function isMember(data) {
-      return isSignedIn() && data != null && data.memberRoles != null && request.auth.uid in data.memberRoles;
+      return isSignedIn() && 
+             data != null && 
+             data.memberRoles != null && 
+             data.memberRoles[request.auth.uid] != null;
     }
 
     function isAdmin(data) {
-      return isSignedIn() && data != null && data.memberRoles != null && 
+      return isSignedIn() && 
+             data != null && 
+             data.memberRoles != null && 
              (data.memberRoles[request.auth.uid] == 'admin' || data.memberRoles[request.auth.uid] == 'owner');
     }
 
@@ -39,13 +44,16 @@ service cloud.firestore {
     /**
      * @description Supports collectionGroup queries for tasks and comments across projects.
      * @principle Authorization Independence: access is checked against the document's own memberRoles map.
+     * CRITICAL: Queries must filter by `memberRoles.<uid> != null` to match this rule.
      */
     match /{path=**}/tasks/{taskId} {
       allow list: if isMember(resource.data);
+      allow get: if isMember(resource.data);
     }
 
     match /{path=**}/comments/{commentId} {
       allow list: if isMember(resource.data);
+      allow get: if isMember(resource.data);
     }
 
     // --- HIERARCHICAL COLLECTION RULES ---
