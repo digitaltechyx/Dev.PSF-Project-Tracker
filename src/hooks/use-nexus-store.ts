@@ -14,7 +14,6 @@ import {
 import { 
   collection, 
   query, 
-  where, 
   doc, 
   collectionGroup
 } from 'firebase/firestore';
@@ -27,7 +26,7 @@ export function useNexusStore() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  // 1. Workspaces - Fetch all workspaces where user is owner or member
+  // 1. Workspaces - Fetch all workspaces
   const workspacesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, 'workspaces'));
@@ -69,8 +68,7 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Global Tasks - Fetch ALL tasks using collection group without filters to avoid index requirements
-  // We will filter by workspaceId locally to ensure the UI is responsive and "just works".
+  // 3. Global Tasks - CRITICAL: No filters in the query to avoid index requirements
   const globalTasksQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collectionGroup(db, 'tasks'));
@@ -78,13 +76,13 @@ export function useNexusStore() {
   
   const { data: globalTasksData, isLoading: isTasksLoading } = useCollection<Task>(globalTasksQuery);
   
-  // Filter tasks locally by workspaceId for the current view
+  // 4. Local Filtering Logic (Bypasses Firestore Index limits)
   const allWorkspaceTasks = useMemo(() => {
     if (!globalTasksData || !activeWorkspace?.id) return [];
+    // Filter by active workspace ID locally
     return globalTasksData.filter(t => t.workspaceId === activeWorkspace.id);
   }, [globalTasksData, activeWorkspace?.id]);
 
-  // 4. Project Tasks - Derived from the global list for consistency
   const projectTasks = useMemo(() => {
     const tasks = activeProjectId 
       ? allWorkspaceTasks.filter(t => t.projectId === activeProjectId)
@@ -98,11 +96,10 @@ export function useNexusStore() {
     );
   }, [allWorkspaceTasks, activeProjectId, globalSearchQuery]);
 
-  // 5. My Tasks - Filtered by assigneeUserId (the simple fix)
   const myTasks = useMemo(() => {
     if (!user?.uid || !allWorkspaceTasks.length) return [];
     
-    // Core logic: Compare current user UID against the assigneeUserId field in the database
+    // Use the assigneeUserId field directly for comparison
     const assigned = allWorkspaceTasks.filter(t => t.assigneeUserId === user.uid);
     
     if (!globalSearchQuery) return assigned;
@@ -113,7 +110,7 @@ export function useNexusStore() {
     );
   }, [allWorkspaceTasks, user?.uid, globalSearchQuery]);
 
-  // 6. Members
+  // 5. Members
   const membersQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id) return null;
     return query(collection(db, 'workspaces', activeWorkspace.id, 'members'));
@@ -195,7 +192,7 @@ export function useNexusStore() {
       status: taskData.status || 'todo',
       priority: taskData.priority || 'medium',
       dueDate: taskData.dueDate || null,
-      assigneeUserId: taskData.assigneeUserId || user.uid,
+      assigneeUserId: taskData.assigneeUserId || user.uid, // Defaults to current user
       tags: taskData.tags || [],
       memberRoles: activeWorkspace.memberRoles || { [user.uid]: 'owner' },
       createdAt: new Date().toISOString(),
