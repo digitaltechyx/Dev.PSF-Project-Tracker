@@ -27,6 +27,7 @@ export function useNexusStore() {
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
   // 1. Fetch Workspaces where user is a member
+  // Explicitly filter by memberRoles to align with Security Rules
   const workspacesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(
@@ -72,6 +73,7 @@ export function useNexusStore() {
   );
 
   // 3. Fetch Tasks (Collection Group for workspace-wide view)
+  // Ensures the query path isn't root by requiring workspaceId and memberRoles filter
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id || !user?.uid) return null;
     return query(
@@ -151,6 +153,7 @@ export function useNexusStore() {
 
     setDocumentNonBlocking(wsRef, wsData, { merge: true });
 
+    // Ensure member document is also created with the role
     const memberRef = doc(db, 'workspaces', wsRef.id, 'members', user.uid);
     setDocumentNonBlocking(memberRef, {
       id: user.uid,

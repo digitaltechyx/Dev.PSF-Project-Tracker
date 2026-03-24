@@ -13,7 +13,7 @@ export default function Home() {
   const auth = useAuth();
   const db = useFirestore();
 
-  // Synchronize user profile to Firestore on login
+  // Synchronize user profile to Firestore on login to ensure it exists for rules/queries
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);

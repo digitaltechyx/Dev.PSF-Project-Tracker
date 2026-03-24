@@ -12,6 +12,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Standardized membership check that is easily provable to the query engine
     function isMember(data) {
       return isSignedIn() && 
              data != null && 
@@ -27,8 +28,8 @@ service cloud.firestore {
     }
 
     // --- COLLECTION GROUP RULES ---
-    // These allow global workspace views (Dashboard, My Tasks)
-    // Query MUST include: .where('memberRoles.<uid>', '>=', '')
+    // These must be at the top level to properly authorize collectionGroup() queries.
+    // The query MUST include a filter on memberRoles for the current user.
 
     match /{path=**}/tasks/{taskId} {
       allow list, get: if isMember(resource.data);
@@ -42,22 +43,24 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false; // Listing users is restricted
+      allow list: if false; 
       allow create, update: if isOwner(userId);
       allow delete: if false;
     }
 
     match /workspaces/{workspaceId} {
-      allow get, list: if isSignedIn() && (resource.data.ownerUserId == request.auth.uid || isMember(resource.data));
+      // For listing workspaces, the rule MUST match the query filter on memberRoles
+      allow list: if isMember(resource.data);
+      allow get: if isMember(resource.data) || isOwner(resource.data.ownerUserId);
       allow create: if isSignedIn() && request.resource.data.ownerUserId == request.auth.uid;
       allow update: if resource != null && (resource.data.ownerUserId == request.auth.uid || isAdmin(resource.data)) && request.resource.data.ownerUserId == resource.data.ownerUserId;
       allow delete: if resource != null && resource.data.ownerUserId == request.auth.uid;
 
       match /members/{memberUserId} {
-        allow get, list: if isSignedIn() && (isMember(resource.data) || isOwner(memberUserId));
-        allow create: if isSignedIn() && isAdmin(request.resource.data);
-        allow update: if resource != null && (isAdmin(resource.data) || isOwner(memberUserId));
-        allow delete: if resource != null && (isAdmin(resource.data) || isOwner(memberUserId));
+        allow get, list: if isMember(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId);
+        allow create: if isSignedIn() && isAdmin(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data);
+        allow update: if resource != null && (isAdmin(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId));
+        allow delete: if resource != null && (isAdmin(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId));
       }
 
       match /projects/{projectId} {
@@ -66,14 +69,13 @@ service cloud.firestore {
         allow update: if resource != null && isAdmin(resource.data);
         allow delete: if resource != null && isAdmin(resource.data);
 
+        // Nested matches inherit or override. The top-level collectionGroup match handles global views.
         match /tasks/{taskId} {
-          allow get, list: if isMember(resource.data);
           allow create: if isSignedIn() && isMember(request.resource.data);
           allow update: if resource != null && isMember(resource.data);
           allow delete: if resource != null && isAdmin(resource.data);
 
           match /comments/{commentId} {
-            allow get, list: if isMember(resource.data);
             allow create: if isSignedIn() && isMember(request.resource.data) && request.resource.data.authorUserId == request.auth.uid;
             allow update: if resource != null && (isOwner(resource.data.authorUserId) || isAdmin(resource.data)) && request.resource.data.authorUserId == resource.data.authorUserId;
             allow delete: if resource != null && (isOwner(resource.data.authorUserId) || isAdmin(resource.data));
