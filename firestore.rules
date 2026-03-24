@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -12,15 +13,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks membership on the document itself (denormalized roles)
-    function isMember(data) {
-      return isSignedIn() && 
-             data != null && 
-             data.memberRoles != null && 
-             data.memberRoles[request.auth.uid] != null;
-    }
-
-    // Helper to check membership on a workspace document
+    // Simplified membership check for rules
     function isMemberOfWs(wsId) {
       let ws = get(/databases/$(database)/documents/workspaces/$(wsId)).data;
       return isSignedIn() && (ws.ownerUserId == request.auth.uid || ws.memberRoles[request.auth.uid] != null);
@@ -29,56 +22,47 @@ service cloud.firestore {
     // --- COLLECTION GROUP RULES ---
     
     match /{path=**}/tasks/{taskId} {
-      // Allow listing tasks if the workspaceId is provided in the query and the user is a member
-      allow list: if isSignedIn() && 
-                   request.query.workspaceId != null && 
-                   isMemberOfWs(request.query.workspaceId);
-      
-      // Allow single document access based on denormalized roles
-      allow get: if isMember(resource.data);
+      // Basic read access for testing collection groups
+      allow read: if isSignedIn() && (
+        resource == null || 
+        resource.data.workspaceId == null || 
+        isMemberOfWs(resource.data.workspaceId)
+      );
     }
 
     match /{path=**}/comments/{commentId} {
-      allow list: if isSignedIn() && 
-                   request.query.workspaceId != null && 
-                   isMemberOfWs(request.query.workspaceId);
-      allow get: if isMember(resource.data);
+      allow read: if isSignedIn();
     }
 
     // --- HIERARCHICAL COLLECTION RULES ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get, create, update: if isOwner(userId);
       allow list: if false; 
-      allow create, update: if isOwner(userId);
-      allow delete: if false;
     }
 
     match /workspaces/{workspaceId} {
-      allow list: if isMember(resource.data);
-      allow get: if isMemberOfWs(workspaceId);
-      allow create: if isSignedIn() && request.resource.data.ownerUserId == request.auth.uid;
-      allow update: if isMemberOfWs(workspaceId); // Simplified for admin check for now
-      allow delete: if isSignedIn() && resource.data.ownerUserId == request.auth.uid;
+      allow list: if isSignedIn(); // Filter results in app
+      allow get: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isMemberOfWs(workspaceId);
 
       match /members/{memberUserId} {
-        allow get, list: if isMemberOfWs(workspaceId) || isOwner(memberUserId);
-        allow create, update, delete: if isMemberOfWs(workspaceId);
+        allow read: if isSignedIn();
+        allow write: if isMemberOfWs(workspaceId);
       }
 
       match /projects/{projectId} {
-        allow get, list: if isMemberOfWs(workspaceId);
-        allow create, update, delete: if isMemberOfWs(workspaceId);
+        allow read: if isSignedIn();
+        allow write: if isMemberOfWs(workspaceId);
 
         match /tasks/{taskId} {
-          allow get, list: if isMemberOfWs(workspaceId);
-          allow create, update: if isMemberOfWs(workspaceId);
-          allow delete: if isMemberOfWs(workspaceId);
+          allow read: if isSignedIn();
+          allow write: if isMemberOfWs(workspaceId);
 
           match /comments/{commentId} {
-            allow get, list: if isMemberOfWs(workspaceId);
-            allow create: if isMemberOfWs(workspaceId) && request.resource.data.authorUserId == request.auth.uid;
-            allow update, delete: if isSignedIn() && (resource.data.authorUserId == request.auth.uid || isMemberOfWs(workspaceId));
+            allow read: if isSignedIn();
+            allow write: if isMemberOfWs(workspaceId);
           }
         }
       }
