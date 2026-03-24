@@ -42,23 +42,13 @@ export function KanbanBoard({
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedTaskId(id);
-    e.dataTransfer.setData('taskId', id);
+    e.dataTransfer.setData('text', id);
     e.dataTransfer.effectAllowed = 'move';
-    
-    // Create a slight delay to allow the ghost image to be created before we change opacity
-    setTimeout(() => {
-      if (document.getElementById(`task-card-${id}`)) {
-        document.getElementById(`task-card-${id}`)?.classList.add('opacity-40');
-      }
-    }, 0);
   };
 
-  const handleDragEnd = (id: string) => {
+  const handleDragEnd = () => {
     setDraggedTaskId(null);
     setActiveColumn(null);
-    if (document.getElementById(`task-card-${id}`)) {
-      document.getElementById(`task-card-${id}`)?.classList.remove('opacity-40');
-    }
   };
 
   const handleDragOver = (e: React.DragEvent, status: Status) => {
@@ -80,7 +70,7 @@ export function KanbanBoard({
 
   const handleDrop = (e: React.DragEvent, status: Status) => {
     e.preventDefault();
-    const taskId = e.dataTransfer.getData('taskId') || draggedTaskId;
+    const taskId = e.dataTransfer.getData('text') || draggedTaskId;
     if (taskId) {
       updateTask(taskId, { status });
     }
@@ -128,15 +118,14 @@ export function KanbanBoard({
             )}>
               {columnTasks.map(task => (
                 <Card 
-                  id={`task-card-${task.id}`}
                   key={task.id} 
                   draggable
                   onDragStart={(e) => handleDragStart(e, task.id)}
-                  onDragEnd={() => handleDragEnd(task.id)}
+                  onDragEnd={handleDragEnd}
                   className={cn(
                     "cursor-grab active:cursor-grabbing hover:shadow-md transition-all border-none border-l-4 shadow-sm bg-card",
                     priorityBorder[task.priority],
-                    draggedTaskId === task.id && "grayscale scale-95"
+                    draggedTaskId === task.id && "opacity-40 grayscale scale-95"
                   )}
                   onClick={() => onTaskClick(task.id)}
                 >
@@ -177,9 +166,9 @@ export function KanbanBoard({
                   </CardContent>
                 </Card>
               ))}
-              {columnTasks.length === 0 && (
+              {columnTasks.length === 0 && !draggedTaskId && (
                 <div className="h-24 flex items-center justify-center border-2 border-dashed rounded-xl text-xs text-muted-foreground/50">
-                  Drop tasks here
+                  No tasks
                 </div>
               )}
             </div>
