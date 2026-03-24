@@ -6,21 +6,19 @@ import {
   useFirestore, 
   useCollection, 
   useMemoFirebase,
-  addDocumentNonBlocking,
+  setDocumentNonBlocking,
   updateDocumentNonBlocking,
-  deleteDocumentNonBlocking,
-  setDocumentNonBlocking
+  deleteDocumentNonBlocking
 } from '@/firebase';
 import { 
   collection, 
   query, 
   where, 
   doc, 
-  serverTimestamp,
   collectionGroup,
   orderBy
 } from 'firebase/firestore';
-import { Workspace, Project, Task, WorkspaceMember, Comment, Notification } from '@/lib/types';
+import { Workspace, Project, Task, WorkspaceMember, Notification } from '@/lib/types';
 
 export function useNexusStore() {
   const { user } = useUser();
@@ -56,7 +54,7 @@ export function useNexusStore() {
     }
   }, [activeWorkspace, activeWorkspaceId]);
 
-  // 2. Fetch Projects for active workspace (Filtered by membership for security rules)
+  // 2. Fetch Projects for active workspace
   const projectsQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace || !user) return null;
     return query(
@@ -73,7 +71,7 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Fetch Tasks (Filtered by workspace and membership)
+  // 3. Fetch Tasks (Collection Group for workspace-wide view)
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace || !user) return null;
     return query(
@@ -181,7 +179,7 @@ export function useNexusStore() {
       name,
       description,
       color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
-      memberRoles: activeWorkspace.memberRoles,
+      memberRoles: (activeWorkspace as any).memberRoles || { [user.uid]: 'owner' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -190,8 +188,9 @@ export function useNexusStore() {
   }, [db, activeWorkspace, user]);
 
   const createTask = useCallback((projectId: string, taskData: Partial<Task>) => {
-    if (!db || !activeWorkspace) return;
+    if (!db || !activeWorkspace || !user) return;
     const taskRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects', projectId, 'tasks'));
+    const memberRoles = (activeWorkspace as any).memberRoles || { [user.uid]: 'owner' };
     
     const newTask = {
       ...taskData,
@@ -205,13 +204,13 @@ export function useNexusStore() {
       dueDate: taskData.dueDate || null,
       assigneeUserId: taskData.assigneeUserId || null,
       tags: taskData.tags || [],
-      memberRoles: activeWorkspace.memberRoles,
+      memberRoles,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     setDocumentNonBlocking(taskRef, newTask, { merge: true });
-  }, [db, activeWorkspace]);
+  }, [db, activeWorkspace, user]);
 
   const updateTask = useCallback((taskId: string, data: Partial<Task>) => {
     if (!db || !activeWorkspace) return;
@@ -229,9 +228,10 @@ export function useNexusStore() {
   }, [db, activeWorkspace, tasks]);
 
   const addMockMember = useCallback((name: string, email: string) => {
-    if (!db || !activeWorkspace) return;
+    if (!db || !activeWorkspace || !user) return;
     const tempId = Math.random().toString(36).substring(7);
     const memberRef = doc(db, 'workspaces', activeWorkspace.id, 'members', tempId);
+    const memberRoles = (activeWorkspace as any).memberRoles || { [user.uid]: 'owner' };
     
     setDocumentNonBlocking(memberRef, {
       id: tempId,
@@ -240,9 +240,9 @@ export function useNexusStore() {
       displayName: name,
       email,
       avatarUrl: `https://picsum.photos/seed/${tempId}/100/100`,
-      memberRoles: activeWorkspace.memberRoles
+      memberRoles
     }, { merge: true });
-  }, [db, activeWorkspace]);
+  }, [db, activeWorkspace, user]);
 
   const removeMember = useCallback((memberId: string) => {
     if (!db || !activeWorkspace) return;
@@ -254,13 +254,14 @@ export function useNexusStore() {
     const task = tasks.find(t => t.id === taskId);
     if (!db || !activeWorkspace || !task || !user) return;
     const commentRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects', task.projectId, 'tasks', taskId, 'comments'));
+    const memberRoles = (activeWorkspace as any).memberRoles || { [user.uid]: 'owner' };
     
     setDocumentNonBlocking(commentRef, {
       id: commentRef.id,
       taskId,
       authorUserId: user.uid,
       body,
-      memberRoles: activeWorkspace.memberRoles,
+      memberRoles,
       createdAt: new Date().toISOString(),
     }, { merge: true });
   }, [db, activeWorkspace, tasks, user]);
@@ -268,7 +269,7 @@ export function useNexusStore() {
   return {
     currentUser: user ? { id: user.uid, name: user.displayName || 'User', email: user.email || '', avatarUrl: user.photoURL || '' } : null,
     workspaces,
-    activeWorkspace: activeWorkspace || { name: 'No Workspace', color: '#ccc' },
+    activeWorkspace: activeWorkspace || { name: 'Loading...', color: '#ccc' },
     workspaceProjects: projects,
     activeProject,
     tasks,
