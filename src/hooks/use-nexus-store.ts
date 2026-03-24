@@ -32,7 +32,7 @@ export function useNexusStore() {
     if (!db || !user) return null;
     return query(
       collection(db, 'workspaces'),
-      where(`memberRoles.${user.uid}`, '>=', '') // Checks if key exists by value range
+      where(`memberRoles.${user.uid}`, '>=', '')
     );
   }, [db, user]);
   
@@ -73,13 +73,14 @@ export function useNexusStore() {
 
   // 3. Fetch Tasks (Collection Group for workspace-wide view)
   const tasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace || !user) return null;
+    if (!db || !activeWorkspace || !user?.uid) return null;
+    // CRITICAL: Filter by workspaceId AND membership to satisfy security rules
     return query(
       collectionGroup(db, 'tasks'),
       where('workspaceId', '==', activeWorkspace.id),
       where(`memberRoles.${user.uid}`, '>=', '')
     );
-  }, [db, activeWorkspace, user]);
+  }, [db, activeWorkspace, user?.uid]);
   
   const { data: tasksData } = useCollection<Task>(tasksQuery);
   const tasks = useMemo(() => tasksData || [], [tasksData]);
