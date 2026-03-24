@@ -27,7 +27,7 @@ export function useNexusStore() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  // 1. Workspaces
+  // 1. Workspaces - Filter by memberRoles to match security rules
   const workspacesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(
@@ -67,23 +67,27 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Global Tasks (Collection Group)
+  // 3. Global Tasks (Collection Group) - MUST filter by memberRoles for security rules
   const globalTasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace?.id) return null;
+    if (!db || !activeWorkspace?.id || !user?.uid) return null;
     return query(
       collectionGroup(db, 'tasks'),
-      where('workspaceId', '==', activeWorkspace.id)
+      where('workspaceId', '==', activeWorkspace.id),
+      where(`memberRoles.${user.uid}`, '>=', '')
     );
-  }, [db, activeWorkspace?.id]);
+  }, [db, activeWorkspace?.id, user?.uid]);
   
   const { data: globalTasksData, isLoading: isTasksLoading } = useCollection<Task>(globalTasksQuery);
   const globalTasks = useMemo(() => globalTasksData || [], [globalTasksData]);
 
-  // 4. Project-Specific Tasks (Direct Collection)
+  // 4. Project-Specific Tasks
   const activeProjectTasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace?.id || !activeProjectId) return null;
-    return query(collection(db, 'workspaces', activeWorkspace.id, 'projects', activeProjectId, 'tasks'));
-  }, [db, activeWorkspace?.id, activeProjectId]);
+    if (!db || !activeWorkspace?.id || !activeProjectId || !user?.uid) return null;
+    return query(
+      collection(db, 'workspaces', activeWorkspace.id, 'projects', activeProjectId, 'tasks'),
+      where(`memberRoles.${user.uid}`, '>=', '')
+    );
+  }, [db, activeWorkspace?.id, activeProjectId, user?.uid]);
 
   const { data: activeProjectTasksData } = useCollection<Task>(activeProjectTasksQuery);
   const activeProjectTasks = useMemo(() => activeProjectTasksData || [], [activeProjectTasksData]);
@@ -265,8 +269,8 @@ export function useNexusStore() {
     activeWorkspace: activeWorkspace || { name: 'Loading...', color: '#ccc', memberRoles: {} },
     workspaceProjects: projects,
     activeProject,
-    workspaceTasks, // Filtered
-    allWorkspaceTasks: globalTasks, // Unfiltered for stats
+    workspaceTasks, 
+    allWorkspaceTasks: globalTasks, 
     projectTasks,
     myTasks,
     tasks: globalTasks, 
