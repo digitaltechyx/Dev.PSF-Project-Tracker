@@ -56,11 +56,14 @@ export function useNexusStore() {
     }
   }, [activeWorkspace, activeWorkspaceId]);
 
-  // 2. Fetch Projects for active workspace
+  // 2. Fetch Projects for active workspace (Filtered by membership for security rules)
   const projectsQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace) return null;
-    return collection(db, 'workspaces', activeWorkspace.id, 'projects');
-  }, [db, activeWorkspace]);
+    if (!db || !activeWorkspace || !user) return null;
+    return query(
+      collection(db, 'workspaces', activeWorkspace.id, 'projects'),
+      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
+    );
+  }, [db, activeWorkspace, user]);
   
   const { data: projectsData } = useCollection<Project>(projectsQuery);
   const projects = useMemo(() => projectsData || [], [projectsData]);
@@ -70,23 +73,27 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Fetch Tasks (using collectionGroup for workspace-wide filtering)
+  // 3. Fetch Tasks (Filtered by workspace and membership)
   const tasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace) return null;
+    if (!db || !activeWorkspace || !user) return null;
     return query(
       collectionGroup(db, 'tasks'),
-      where('workspaceId', '==', activeWorkspace.id)
+      where('workspaceId', '==', activeWorkspace.id),
+      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
     );
-  }, [db, activeWorkspace]);
+  }, [db, activeWorkspace, user]);
   
   const { data: tasksData } = useCollection<Task>(tasksQuery);
   const tasks = useMemo(() => tasksData || [], [tasksData]);
 
   // 4. Fetch Members for active workspace
   const membersQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace) return null;
-    return collection(db, 'workspaces', activeWorkspace.id, 'members');
-  }, [db, activeWorkspace]);
+    if (!db || !activeWorkspace || !user) return null;
+    return query(
+      collection(db, 'workspaces', activeWorkspace.id, 'members'),
+      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member'])
+    );
+  }, [db, activeWorkspace, user]);
   
   const { data: membersData } = useCollection<WorkspaceMember>(membersQuery);
   const members = useMemo(() => membersData || [], [membersData]);

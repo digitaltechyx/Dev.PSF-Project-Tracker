@@ -34,8 +34,8 @@ import { generateTaskDescription } from '@/ai/flows/ai-task-description-generati
 import { suggestTaskAttributes } from '@/ai/flows/ai-task-attribute-suggestion';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 
 export function TaskDetailPanel({ 
   taskId, 
@@ -49,6 +49,7 @@ export function TaskDetailPanel({
   store: any
 }) {
   const db = useFirestore();
+  const { user } = useUser();
   const task = store.tasks?.find((t: any) => t.id === taskId);
   const { toast } = useToast();
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
@@ -62,12 +63,13 @@ export function TaskDetailPanel({
 
   // Real-time comments listener
   const commentsQuery = useMemoFirebase(() => {
-    if (!db || !task) return null;
+    if (!db || !task || !user) return null;
     return query(
       collection(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', task.id, 'comments'),
+      where(`memberRoles.${user.uid}`, 'in', ['owner', 'admin', 'member']),
       orderBy('createdAt', 'asc')
     );
-  }, [db, task]);
+  }, [db, task, user]);
   const { data: comments = [] } = useCollection(commentsQuery);
 
   if (!task) return null;
