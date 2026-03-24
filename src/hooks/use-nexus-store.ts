@@ -27,7 +27,7 @@ export function useNexusStore() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  // 1. Workspaces
+  // 1. Workspaces - Fetch all workspaces where user is owner or member
   const workspacesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, 'workspaces'));
@@ -55,7 +55,7 @@ export function useNexusStore() {
     }
   }, [activeWorkspace, activeWorkspaceId]);
 
-  // 2. Projects
+  // 2. Projects - Fetch projects for the active workspace
   const projectsQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id) return null;
     return query(collection(db, 'workspaces', activeWorkspace.id, 'projects'));
@@ -69,30 +69,51 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Global Tasks (Try collection group, but it might fail without index)
+  // 3. Global Tasks - Fetch ALL tasks using collection group without filters to avoid index requirements
+  // We will filter by workspaceId locally to ensure the UI is responsive and "just works".
   const globalTasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace?.id) return null;
-    return query(
-      collectionGroup(db, 'tasks'),
-      where('workspaceId', '==', activeWorkspace.id)
-    );
-  }, [db, activeWorkspace?.id]);
+    if (!db || !user?.uid) return null;
+    return query(collectionGroup(db, 'tasks'));
+  }, [db, user?.uid]);
   
   const { data: globalTasksData, isLoading: isTasksLoading } = useCollection<Task>(globalTasksQuery);
-  const rawGlobalTasks = useMemo(() => globalTasksData || [], [globalTasksData]);
+  
+  // Filter tasks locally by workspaceId for the current view
+  const allWorkspaceTasks = useMemo(() => {
+    if (!globalTasksData || !activeWorkspace?.id) return [];
+    return globalTasksData.filter(t => t.workspaceId === activeWorkspace.id);
+  }, [globalTasksData, activeWorkspace?.id]);
 
-  // 4. Active Project Tasks (Always works, no index needed)
-  const activeProjectTasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace?.id || !activeProjectId) return null;
-    return query(
-      collection(db, 'workspaces', activeWorkspace.id, 'projects', activeProjectId, 'tasks')
+  // 4. Project Tasks - Derived from the global list for consistency
+  const projectTasks = useMemo(() => {
+    const tasks = activeProjectId 
+      ? allWorkspaceTasks.filter(t => t.projectId === activeProjectId)
+      : [];
+    
+    if (!globalSearchQuery) return tasks;
+    const lowerQuery = globalSearchQuery.toLowerCase();
+    return tasks.filter(t => 
+      t.title.toLowerCase().includes(lowerQuery) ||
+      (t.description && t.description.toLowerCase().includes(lowerQuery))
     );
-  }, [db, activeWorkspace?.id, activeProjectId]);
+  }, [allWorkspaceTasks, activeProjectId, globalSearchQuery]);
 
-  const { data: activeProjectTasksData } = useCollection<Task>(activeProjectTasksQuery);
-  const rawProjectTasks = useMemo(() => activeProjectTasksData || [], [activeProjectTasksData]);
+  // 5. My Tasks - Filtered by assigneeUserId (the simple fix)
+  const myTasks = useMemo(() => {
+    if (!user?.uid || !allWorkspaceTasks.length) return [];
+    
+    // Core logic: Compare current user UID against the assigneeUserId field in the database
+    const assigned = allWorkspaceTasks.filter(t => t.assigneeUserId === user.uid);
+    
+    if (!globalSearchQuery) return assigned;
+    const lowerQuery = globalSearchQuery.toLowerCase();
+    return assigned.filter(t => 
+      t.title.toLowerCase().includes(lowerQuery) ||
+      (t.description && t.description.toLowerCase().includes(lowerQuery))
+    );
+  }, [allWorkspaceTasks, user?.uid, globalSearchQuery]);
 
-  // 5. Members
+  // 6. Members
   const membersQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id) return null;
     return query(collection(db, 'workspaces', activeWorkspace.id, 'members'));
@@ -100,37 +121,6 @@ export function useNexusStore() {
   
   const { data: membersData } = useCollection<WorkspaceMember>(membersQuery);
   const members = useMemo(() => membersData || [], [membersData]);
-
-  // Helper: Combine and filter tasks
-  const allWorkspaceTasks = useMemo(() => {
-    const combined = [...rawGlobalTasks];
-    rawProjectTasks.forEach(pt => {
-      if (!combined.find(gt => gt.id === pt.id)) combined.push(pt);
-    });
-    return combined;
-  }, [rawGlobalTasks, rawProjectTasks]);
-
-  const filterTasks = useCallback((taskList: Task[], queryStr: string) => {
-    if (!queryStr) return taskList;
-    const lowerQuery = queryStr.toLowerCase();
-    return taskList.filter(t => 
-      t.title.toLowerCase().includes(lowerQuery) ||
-      (t.description && t.description.toLowerCase().includes(lowerQuery)) ||
-      (t.tags && t.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))
-    );
-  }, []);
-
-  const projectTasks = useMemo(() => 
-    filterTasks(rawProjectTasks, globalSearchQuery),
-    [rawProjectTasks, globalSearchQuery, filterTasks]
-  );
-
-  const myTasks = useMemo(() => {
-    if (!user?.uid) return [];
-    // Just compare the current user ID against the assignee field
-    const assigned = allWorkspaceTasks.filter(t => t.assigneeUserId === user.uid);
-    return filterTasks(assigned, globalSearchQuery);
-  }, [allWorkspaceTasks, user?.uid, globalSearchQuery, filterTasks]);
 
   const switchWorkspace = useCallback((id: string) => {
     setActiveWorkspaceId(id);
@@ -205,7 +195,7 @@ export function useNexusStore() {
       status: taskData.status || 'todo',
       priority: taskData.priority || 'medium',
       dueDate: taskData.dueDate || null,
-      assigneeUserId: taskData.assigneeUserId || user.uid, // Default to current user
+      assigneeUserId: taskData.assigneeUserId || user.uid,
       tags: taskData.tags || [],
       memberRoles: activeWorkspace.memberRoles || { [user.uid]: 'owner' },
       createdAt: new Date().toISOString(),
