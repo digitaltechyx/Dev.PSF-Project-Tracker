@@ -82,7 +82,8 @@ export function TaskDetailPanel({
     );
   }, [db, task, user]);
   
-  const { data: comments = [] } = useCollection(commentsQuery);
+  const { data: commentsData } = useCollection(commentsQuery);
+  const comments = commentsData || [];
 
   if (!task) return null;
 

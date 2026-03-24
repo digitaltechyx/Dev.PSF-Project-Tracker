@@ -150,7 +150,7 @@ export function useNexusStore() {
     const wsData: Workspace = {
       id: wsRef.id,
       name,
-      description,
+      description: description || '',
       color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
       ownerUserId: user.uid,
       memberRoles,
@@ -183,7 +183,7 @@ export function useNexusStore() {
       id: projRef.id,
       workspaceId: activeWorkspace.id,
       name,
-      description,
+      description: description || '',
       color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
       memberRoles,
       createdAt: new Date().toISOString(),
@@ -220,7 +220,7 @@ export function useNexusStore() {
   const updateTask = useCallback((taskId: string, data: Partial<Task>) => {
     if (!db) return;
     
-    // Find task in project tasks first, then global tasks
+    // Hardened task lookup
     const task = activeProjectTasks.find(t => t.id === taskId) || globalTasks.find(t => t.id === taskId);
     
     if (!task) return;
