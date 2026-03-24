@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -279,6 +280,7 @@
   },
   "auth": {
     "providers": [
+      "google.com",
       "password",
       "anonymous"
     ]
@@ -409,7 +411,8 @@
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to be secure, scalable, and debuggable, strictly adhering to the core design principles and strategy mandates. The fundamental approach revolves around strong authorization independence, achieved primarily through denormalization of authorization context.\n\n1.  **Authorization Independence (CRITICAL):** To eliminate the need for `get()` calls in security rules, which break atomic operations and complicate debugging, a `memberRoles` map is denormalized across all collaborative entities. Each `Workspace` document, as well as its nested `Project`, `Task`, and `Comment` documents, will include a `memberRoles: { [userId: string]: 'owner' | 'admin' | 'member' }` field. This ensures that any access request to these documents can be immediately validated by checking `request.auth.uid in resource.data.memberRoles` or `request.auth.uid == resource.data.ownerUserId`, making authorization checks atomic and highly performant.\n\n2.  **Structural Segregation (Homogeneous Security Posture):** Data is segregated into distinct collections based on its security requirements. For example, `/users/{userId}` is strictly for user-owned profile data, while all data within `/workspaces/{workspaceId}` (and its subcollections) is subject to workspace-specific membership rules. There is no mixing of public/private or different access levels within the same collection.\n\n3.  **Access Modeling & Hierarchical Paths:**\n    *   **Private User Data:** `/users/{userId}` stores individual `User` profiles, where the `{userId}` wildcard directly matches `request.auth.uid` for simple, path-based ownership.\n    *   **Collaborative Workspaces:** `/workspaces/{workspaceId}` serves as the root for collaborative data. The `Workspace` document itself contains the crucial `ownerUserId` and the denormalized `memberRoles` map.\n    *   **Nested Collaboration:** `Project`, `Task`, and `Comment` entities follow a clear hierarchical path structure within the workspace: `/workspaces/{workspaceId}/projects/{projectId}`, `/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}`, and `/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}/comments/{commentId}`. Each of these documents includes the denormalized `workspaceId`, its direct parent's ID (e.g., `projectId` in `Task`), and the `memberRoles` map from the parent workspace, providing full context for authorization without upward traversal.\n    *   **Workspace Members List:** The `/workspaces/{workspaceId}/members/{userId}` subcollection is used to store specific `WorkspaceMember` details (e.g., display name, avatar) for *listing* purposes within a workspace, complementing the `memberRoles` map used for authorization.\n\n4.  **QAPs (Rules are not Filters):** The structure explicitly supports efficient and secure `list` operations:\n    *   **Fetching user workspaces:** A user can efficiently query all workspaces they are a member of using `db.collection('workspaces').where('memberRoles.' + request.auth.uid, 'exists', true)`. This query directly leverages the denormalized `memberRoles` map, which is indexable by Firestore, satisfying the QAP principle.\n    *   **Fetching projects within a workspace:** `db.collection('workspaces/{workspaceId}/projects')` operations are secured because each `Project` document contains the denormalized `memberRoles` map, allowing rules to enforce access without `get()` operations. Similar logic applies to `Task` and `Comment` subcollections.\n    *   **Dashboard Stats:** Denormalized `workspaceId` and `projectId` fields in `Task` documents enable efficient `collectionGroup` queries to aggregate data (e.g., total tasks, overdue tasks across projects within a workspace) without complex joins or insecure list operations."
+    ]
   }
 }
+
+    
