@@ -13,6 +13,7 @@ service cloud.firestore {
     }
 
     // Standardized membership check for map-based roles
+    // The query MUST include a filter on memberRoles[uid] to be provable.
     function isMember(data) {
       return isSignedIn() && 
              data != null && 
@@ -29,8 +30,7 @@ service cloud.firestore {
 
     // --- COLLECTION GROUP RULES ---
     // These must be defined to authorize collectionGroup() queries used in Dashboard and Global views.
-    // The query MUST include a filter on memberRoles[uid] to be provable.
-
+    
     match /{path=**}/tasks/{taskId} {
       allow list, get: if isMember(resource.data);
     }
@@ -49,7 +49,7 @@ service cloud.firestore {
     }
 
     match /workspaces/{workspaceId} {
-      // workspace listing requires a filter on memberRoles[uid]
+      // Workspace listing requires a filter: where('memberRoles.' + uid, '>=', '')
       allow list: if isMember(resource.data);
       allow get: if isMember(resource.data) || isOwner(resource.data.ownerUserId);
       allow create: if isSignedIn() && request.resource.data.ownerUserId == request.auth.uid;
@@ -57,7 +57,7 @@ service cloud.firestore {
       allow delete: if resource != null && resource.data.ownerUserId == request.auth.uid;
 
       match /members/{memberUserId} {
-        allow get, list: if isMember(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId);
+        allow get, list: if isSignedIn() && (isMember(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId));
         allow create: if isSignedIn() && isAdmin(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data);
         allow update: if resource != null && (isAdmin(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId));
         allow delete: if resource != null && (isAdmin(get(/databases/$(database)/documents/workspaces/$(workspaceId)).data) || isOwner(memberUserId));

@@ -73,8 +73,8 @@ export function useNexusStore() {
 
   // 3. Fetch Tasks (Collection Group for workspace-wide view)
   const tasksQuery = useMemoFirebase(() => {
-    // CRITICAL: Ensure we have a valid workspace and user before attempting a group query
-    if (!db || !activeWorkspace?.id || !user?.uid || activeWorkspace.id === 'Loading...') return null;
+    // CRITICAL: Prevent root path queries by ensuring we have a valid workspace context and user
+    if (!db || !user?.uid || !activeWorkspace?.id || activeWorkspace.id === 'Loading...') return null;
     return query(
       collectionGroup(db, 'tasks'),
       where('workspaceId', '==', activeWorkspace.id),
@@ -170,7 +170,10 @@ export function useNexusStore() {
   const createProject = useCallback((name: string, description: string) => {
     if (!db || !activeWorkspace?.id || !user) return;
     const projRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects'));
-    const memberRoles = activeWorkspace.memberRoles || { [user.uid]: 'owner' as const };
+    // Ensure memberRoles is copied from the workspace for authorization independence
+    const memberRoles = activeWorkspace.memberRoles && Object.keys(activeWorkspace.memberRoles).length > 0 
+      ? activeWorkspace.memberRoles 
+      : { [user.uid]: 'owner' as const };
     
     const projData: Project = {
       id: projRef.id,
@@ -189,7 +192,9 @@ export function useNexusStore() {
   const createTask = useCallback((projectId: string, taskData: Partial<Task>) => {
     if (!db || !activeWorkspace?.id || !user) return;
     const taskRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects', projectId, 'tasks'));
-    const memberRoles = activeWorkspace.memberRoles || { [user.uid]: 'owner' as const };
+    const memberRoles = activeWorkspace.memberRoles && Object.keys(activeWorkspace.memberRoles).length > 0 
+      ? activeWorkspace.memberRoles 
+      : { [user.uid]: 'owner' as const };
     
     const newTask: Task = {
       id: taskRef.id,
@@ -229,7 +234,9 @@ export function useNexusStore() {
     if (!db || !activeWorkspace?.id || !user) return;
     const tempId = Math.random().toString(36).substring(7);
     const memberRef = doc(db, 'workspaces', activeWorkspace.id, 'members', tempId);
-    const memberRoles = activeWorkspace.memberRoles || { [user.uid]: 'owner' as const };
+    const memberRoles = activeWorkspace.memberRoles && Object.keys(activeWorkspace.memberRoles).length > 0 
+      ? activeWorkspace.memberRoles 
+      : { [user.uid]: 'owner' as const };
     
     setDocumentNonBlocking(memberRef, {
       id: tempId,
@@ -252,7 +259,9 @@ export function useNexusStore() {
     const task = tasks.find(t => t.id === taskId);
     if (!db || !activeWorkspace?.id || !task || !user) return;
     const commentRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects', task.projectId, 'tasks', taskId, 'comments'));
-    const memberRoles = activeWorkspace.memberRoles || { [user.uid]: 'owner' as const };
+    const memberRoles = activeWorkspace.memberRoles && Object.keys(activeWorkspace.memberRoles).length > 0 
+      ? activeWorkspace.memberRoles 
+      : { [user.uid]: 'owner' as const };
     
     setDocumentNonBlocking(commentRef, {
       id: commentRef.id,
