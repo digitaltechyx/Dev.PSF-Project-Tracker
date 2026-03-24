@@ -105,9 +105,9 @@ export function NexusShell() {
                 <div className="flex items-center gap-2 overflow-hidden">
                   <div 
                     className="w-5 h-5 rounded flex-shrink-0" 
-                    style={{ backgroundColor: store.activeWorkspace.color }}
+                    style={{ backgroundColor: store.activeWorkspace?.color || '#ccc' }}
                   />
-                  <span className="truncate">{store.activeWorkspace.name}</span>
+                  <span className="truncate">{store.activeWorkspace?.name || 'Loading...'}</span>
                 </div>
                 <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
               </Button>
@@ -116,7 +116,7 @@ export function NexusShell() {
               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 My Workspaces
               </div>
-              {store.workspaces.map(w => (
+              {store.workspaces?.map(w => (
                 <DropdownMenuItem key={w.id} onClick={() => store.switchWorkspace(w.id)}>
                   <div className="flex items-center gap-2">
                     <div 
@@ -127,6 +127,11 @@ export function NexusShell() {
                   </div>
                 </DropdownMenuItem>
               ))}
+              {store.workspaces?.length === 0 && (
+                <div className="px-2 py-4 text-center text-xs text-muted-foreground italic">
+                  No workspaces yet
+                </div>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button 
@@ -188,7 +193,7 @@ export function NexusShell() {
               </Button>
             </div>
             <div className="space-y-1">
-              {store.workspaceProjects.map(p => (
+              {store.workspaceProjects?.map(p => (
                 <Button 
                   key={p.id} 
                   variant={store.activeProject?.id === p.id && currentView === 'project' ? 'secondary' : 'ghost'} 
@@ -199,7 +204,7 @@ export function NexusShell() {
                   <span className="truncate">{p.name}</span>
                 </Button>
               ))}
-              {store.workspaceProjects.length === 0 && (
+              {(!store.workspaceProjects || store.workspaceProjects.length === 0) && (
                 <div className="px-2 py-4 text-center text-sm text-muted-foreground italic">
                   No projects yet
                 </div>
