@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -29,7 +30,7 @@ export function KanbanBoard({
 }: { 
   tasks: Task[], 
   onTaskClick: (id: string) => void,
-  updateTask: any,
+  updateTask: (id: string, data: Partial<Task>) => void,
   onAddTask?: (status: Status) => void
 }) {
   const [mounted, setMounted] = useState(false);
@@ -44,42 +45,45 @@ export function KanbanBoard({
     setDraggedTaskId(id);
     e.dataTransfer.setData('text', id);
     e.dataTransfer.effectAllowed = 'move';
+    
+    // Create a ghost image if needed, but standard is fine
+    const target = e.target as HTMLElement;
+    target.style.opacity = '0.4';
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e: React.DragEvent) => {
     setDraggedTaskId(null);
     setActiveColumn(null);
+    const target = e.target as HTMLElement;
+    target.style.opacity = '1';
   };
 
   const handleDragOver = (e: React.DragEvent, status: Status) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (activeColumn !== status) setActiveColumn(status);
+    if (activeColumn !== status) {
+      setActiveColumn(status);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    
-    // Only clear if the mouse actually left the column boundaries
-    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
-      setActiveColumn(null);
-    }
+    // Basic leave handling
   };
 
   const handleDrop = (e: React.DragEvent, status: Status) => {
     e.preventDefault();
-    const taskId = e.dataTransfer.getData('text') || draggedTaskId;
+    const taskId = e.dataTransfer.getData('text');
+    
     if (taskId) {
       updateTask(taskId, { status });
     }
+    
     setDraggedTaskId(null);
     setActiveColumn(null);
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-[500px]">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-[600px] pb-10">
       {columns.map(col => {
         const columnTasks = tasks.filter(t => t.status === col.id);
         
@@ -88,7 +92,7 @@ export function KanbanBoard({
             key={col.id} 
             className="flex flex-col gap-4"
             onDragOver={(e) => handleDragOver(e, col.id)}
-            onDragLeave={handleDragLeave}
+            onDragEnter={(e) => { e.preventDefault(); setActiveColumn(col.id); }}
             onDrop={(e) => handleDrop(e, col.id)}
           >
             <div className="flex items-center justify-between px-2">
@@ -99,21 +103,19 @@ export function KanbanBoard({
                 </h3>
                 <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{columnTasks.length}</Badge>
               </div>
-              <div className="flex gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7"
-                  onClick={() => onAddTask?.(col.id)}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={() => onAddTask?.(col.id)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className={cn(
-              "flex-1 space-y-3 bg-muted/30 p-2 rounded-xl min-h-[200px] transition-all duration-200 border-2 border-transparent",
-              activeColumn === col.id && "bg-muted/60 border-primary/20 scale-[1.01] shadow-inner",
+              "flex-1 space-y-3 bg-muted/20 p-3 rounded-xl min-h-[500px] transition-all duration-200 border-2 border-transparent",
+              activeColumn === col.id && "bg-muted/50 border-primary/20 scale-[1.01] shadow-inner",
               draggedTaskId && activeColumn !== col.id && "opacity-80"
             )}>
               {columnTasks.map(task => (
@@ -125,7 +127,7 @@ export function KanbanBoard({
                   className={cn(
                     "cursor-grab active:cursor-grabbing hover:shadow-md transition-all border-none border-l-4 shadow-sm bg-card",
                     priorityBorder[task.priority],
-                    draggedTaskId === task.id && "opacity-40 grayscale scale-95"
+                    draggedTaskId === task.id && "opacity-0" // Hide the original card while dragging
                   )}
                   onClick={() => onTaskClick(task.id)}
                 >
@@ -157,7 +159,6 @@ export function KanbanBoard({
                             {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                           </div>
                         )}
-                        {!mounted && task.dueDate && <div className="h-3 w-8 bg-muted animate-pulse rounded" />}
                       </div>
                       <div className="flex -space-x-2">
                         <div className="w-5 h-5 rounded-full bg-primary/10 border-2 border-background" />
@@ -166,9 +167,9 @@ export function KanbanBoard({
                   </CardContent>
                 </Card>
               ))}
-              {columnTasks.length === 0 && !draggedTaskId && (
-                <div className="h-24 flex items-center justify-center border-2 border-dashed rounded-xl text-xs text-muted-foreground/50">
-                  No tasks
+              {columnTasks.length === 0 && (
+                <div className="h-32 flex items-center justify-center border-2 border-dashed rounded-xl text-xs text-muted-foreground/30">
+                  Drop tasks here
                 </div>
               )}
             </div>
