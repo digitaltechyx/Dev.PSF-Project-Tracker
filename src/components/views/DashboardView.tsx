@@ -16,28 +16,36 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function DashboardView({ store, onNavigateToProject }: { store: any, onNavigateToProject: (id: string) => void }) {
-  const { allWorkspaceTasks, workspaceTasks, workspaceProjects, activeWorkspace, isTasksLoading } = store;
+  const { allWorkspaceTasks, workspaceProjects, activeWorkspace, isTasksLoading } = store;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Use allWorkspaceTasks for accurate stats that aren't affected by search filters
+  // Stats derived from raw unfiltered data
   const stats = useMemo(() => {
     const tasks = allWorkspaceTasks || [];
+    const now = new Date();
     return {
       totalProjects: workspaceProjects.length,
       totalTasks: tasks.length,
       doneTasks: tasks.filter((t: any) => t.status === 'done').length,
       inProgress: tasks.filter((t: any) => t.status === 'in_progress').length,
       todo: tasks.filter((t: any) => t.status === 'todo').length,
-      overdue: tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length,
+      overdue: tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'done').length,
       urgent: tasks.filter((t: any) => t.priority === 'urgent').length,
     };
   }, [allWorkspaceTasks, workspaceProjects.length]);
 
   const completionRate = stats.totalTasks > 0 ? (stats.doneTasks / stats.totalTasks) * 100 : 0;
+
+  // Sorted list for recent activity
+  const recentTasks = useMemo(() => {
+    return [...allWorkspaceTasks].sort((a: any, b: any) => 
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    ).slice(0, 5);
+  }, [allWorkspaceTasks]);
 
   if (isTasksLoading && !allWorkspaceTasks.length) {
     return (
@@ -116,7 +124,7 @@ export function DashboardView({ store, onNavigateToProject }: { store: any, onNa
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {workspaceTasks.slice(0, 5).map((task: any) => (
+              {recentTasks.map((task: any) => (
                 <div key={task.id} className="flex items-start gap-4 group">
                   <div className="mt-1">
                     {task.status === 'done' ? (
@@ -147,7 +155,7 @@ export function DashboardView({ store, onNavigateToProject }: { store: any, onNa
                   </div>
                 </div>
               ))}
-              {workspaceTasks.length === 0 && (
+              {allWorkspaceTasks.length === 0 && (
                 <div className="text-center py-10 text-muted-foreground space-y-2">
                   <p>No tasks found in this workspace.</p>
                   <p className="text-xs">Create a project and add your first task to see activity here.</p>
