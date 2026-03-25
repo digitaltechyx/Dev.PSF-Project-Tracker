@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -26,7 +25,7 @@ export function useNexusStore() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  // 1. Workspaces
+  // 1. Workspaces - Hierarchical read for basic access
   const workspacesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, 'workspaces'));
@@ -54,7 +53,7 @@ export function useNexusStore() {
     }
   }, [activeWorkspace, activeWorkspaceId]);
 
-  // 2. Projects
+  // 2. Projects - Direct hierarchical query
   const projectsQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id) return null;
     return query(collection(db, 'workspaces', activeWorkspace.id, 'projects'));
@@ -68,43 +67,38 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Project-Specific Tasks (GUARANTEED TO WORK - NO INDEX NEEDED)
-  const projectTasksQuery = useMemoFirebase(() => {
-    if (!db || !activeWorkspace?.id || !activeProjectId) return null;
-    return query(collection(db, 'workspaces', activeWorkspace.id, 'projects', activeProjectId, 'tasks'));
-  }, [db, activeWorkspace?.id, activeProjectId]);
+  // 3. Global Task Stream - No filters to avoid index requirements
+  const globalTasksQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    // We fetch all tasks and filter in memory to guarantee visibility without manual indexes
+    return query(collectionGroup(db, 'tasks'));
+  }, [db, user?.uid]);
+  
+  const { data: globalTasksData, isLoading: isTasksLoading } = useCollection<Task>(globalTasksQuery);
+  
+  // Tasks filtered for the active workspace
+  const allWorkspaceTasks = useMemo(() => {
+    if (!globalTasksData || !activeWorkspace?.id) return [];
+    return globalTasksData.filter(t => t.workspaceId === activeWorkspace.id);
+  }, [globalTasksData, activeWorkspace?.id]);
 
-  const { data: projectTasksData } = useCollection<Task>(projectTasksQuery);
+  // Tasks assigned to the current user (My Tasks)
+  const myTasks = useMemo(() => {
+    if (!user?.uid) return [];
+    return allWorkspaceTasks.filter(t => t.assigneeUserId === user.uid);
+  }, [allWorkspaceTasks, user?.uid]);
+
+  // 4. Active Project Tasks - Direct path for performance
   const projectTasks = useMemo(() => {
-    const tasks = projectTasksData || [];
+    if (!activeProject) return [];
+    const tasks = allWorkspaceTasks.filter(t => t.projectId === activeProject.id);
     if (!globalSearchQuery) return tasks;
     const lowerQuery = globalSearchQuery.toLowerCase();
     return tasks.filter(t => 
       t.title.toLowerCase().includes(lowerQuery) ||
       (t.description && t.description.toLowerCase().includes(lowerQuery))
     );
-  }, [projectTasksData, globalSearchQuery]);
-
-  // 4. Global Tasks (For Dashboard and My Tasks - Uses collectionGroup)
-  // We use an UNFILTERED query here because it doesn't require extra indexes.
-  const globalTasksQuery = useMemoFirebase(() => {
-    if (!db || !user?.uid) return null;
-    return query(collectionGroup(db, 'tasks'));
-  }, [db, user?.uid]);
-  
-  const { data: globalTasksData, isLoading: isTasksLoading } = useCollection<Task>(globalTasksQuery);
-  
-  const allWorkspaceTasks = useMemo(() => {
-    if (!globalTasksData || !activeWorkspace?.id) return [];
-    // Filter locally to avoid index requirements
-    return globalTasksData.filter(t => t.workspaceId === activeWorkspace.id);
-  }, [globalTasksData, activeWorkspace?.id]);
-
-  const myTasks = useMemo(() => {
-    if (!user?.uid) return [];
-    // Filter the global set for the current user
-    return allWorkspaceTasks.filter(t => t.assigneeUserId === user.uid);
-  }, [allWorkspaceTasks, user?.uid]);
+  }, [allWorkspaceTasks, activeProject, globalSearchQuery]);
 
   // 5. Members
   const membersQuery = useMemoFirebase(() => {
@@ -200,8 +194,7 @@ export function useNexusStore() {
 
   const updateTask = useCallback((taskId: string, data: Partial<Task>) => {
     if (!db) return;
-    // Find task in either global or local set
-    const task = allWorkspaceTasks.find(t => t.id === taskId) || projectTasksData?.find(t => t.id === taskId);
+    const task = allWorkspaceTasks.find(t => t.id === taskId);
     if (!task) return;
     
     const taskRef = doc(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', taskId);
@@ -209,14 +202,14 @@ export function useNexusStore() {
       ...data, 
       updatedAt: new Date().toISOString() 
     });
-  }, [db, allWorkspaceTasks, projectTasksData]);
+  }, [db, allWorkspaceTasks]);
 
   const deleteTask = useCallback((taskId: string) => {
-    const task = allWorkspaceTasks.find(t => t.id === taskId) || projectTasksData?.find(t => t.id === taskId);
+    const task = allWorkspaceTasks.find(t => t.id === taskId);
     if (!db || !task) return;
     const taskRef = doc(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', taskId);
     deleteDocumentNonBlocking(taskRef);
-  }, [db, allWorkspaceTasks, projectTasksData]);
+  }, [db, allWorkspaceTasks]);
 
   const addMockMember = useCallback((name: string, email: string) => {
     if (!db || !activeWorkspace?.id || !user) return;
@@ -240,7 +233,7 @@ export function useNexusStore() {
   }, [db, activeWorkspace]);
 
   const addComment = useCallback((taskId: string, body: string) => {
-    const task = allWorkspaceTasks.find(t => t.id === taskId) || projectTasksData?.find(t => t.id === taskId);
+    const task = allWorkspaceTasks.find(t => t.id === taskId);
     if (!db || !task || !user) return;
     const commentRef = doc(collection(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', taskId, 'comments'));
     
@@ -253,7 +246,7 @@ export function useNexusStore() {
       memberRoles: task.memberRoles,
       createdAt: new Date().toISOString(),
     }, { merge: true });
-  }, [db, allWorkspaceTasks, projectTasksData, user]);
+  }, [db, allWorkspaceTasks, user]);
 
   return {
     currentUser: user ? { id: user.uid, name: user.displayName || 'User', email: user.email || '', avatarUrl: user.photoURL || null } : null,
