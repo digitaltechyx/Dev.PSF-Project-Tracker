@@ -4,14 +4,15 @@ import { NexusShell } from '@/components/NexusShell';
 import { useUser, useAuth, useFirestore } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
-import { LogIn, Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { LogIn, Loader2, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 
 export default function Home() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const db = useFirestore();
+  const [error, setError] = useState<string | null>(null);
 
   // Ensure user document exists in Firestore immediately upon login.
   // This is required for security rules to validate the user's identity path.
@@ -29,11 +30,14 @@ export default function Home() {
   }, [user, db]);
 
   const handleLogin = async () => {
+    setError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed", error);
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user') return;
+      console.error("Login failed", err);
+      setError('Login failed: ' + (err.message || 'Please try again.'));
     }
   };
 
@@ -52,6 +56,14 @@ export default function Home() {
           <h1 className="text-4xl font-bold font-headline text-primary">NexusTrack</h1>
           <p className="text-muted-foreground">Manage projects with speed and clarity.</p>
         </div>
+        
+        {error && (
+          <div className="flex items-center gap-2 p-3 text-sm bg-destructive/10 text-destructive rounded-lg max-w-sm">
+            <AlertCircle className="h-4 w-4" />
+            {error}
+          </div>
+        )}
+
         <Button size="lg" onClick={handleLogin} className="gap-2">
           <LogIn className="h-5 w-5" />
           Login with Google

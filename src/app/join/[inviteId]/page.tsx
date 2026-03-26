@@ -21,6 +21,20 @@ export default function JoinPage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync user profile to Firestore immediately upon login
+  useEffect(() => {
+    if (user && db) {
+      const userRef = doc(db, 'users', user.uid);
+      setDoc(userRef, {
+        id: user.uid,
+        name: user.displayName || 'User',
+        email: user.email?.toLowerCase() || '',
+        avatarUrl: user.photoURL,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+  }, [user, db]);
+
   useEffect(() => {
     const fetchInvite = async () => {
       if (!db || !inviteId) return;
@@ -64,11 +78,15 @@ export default function JoinPage() {
   }, [db, inviteId]);
 
   const handleLogin = async () => {
+    setError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setError('Login failed. Please try again.');
+      // Don't show error if user closed the popup
+      if (err.code === 'auth/popup-closed-by-user') return;
+      console.error("Login failed:", err);
+      setError('Login failed: ' + (err.message || 'Please try again.'));
     }
   };
 
