@@ -67,12 +67,12 @@ export function useNexusStore() {
 
   const isAdmin = useMemo(() => isOwner || currentRole === 'lead' || currentRole === 'owner', [isOwner, currentRole]);
 
-  // 3. Fetch projects for the active workspace
+  // 3. Fetch projects for the active workspace - GATED BY USER
   const projectsQuery = useMemoFirebase(() => {
     const wsId = activeWorkspaceId || activeWorkspace?.id;
-    if (!db || !wsId) return null;
+    if (!db || !user?.uid || !wsId) return null;
     return query(collection(db, 'workspaces', wsId, 'projects'));
-  }, [db, activeWorkspaceId, activeWorkspace?.id]);
+  }, [db, user?.uid, activeWorkspaceId, activeWorkspace?.id]);
   
   const { data: projectsData, isLoading: isProjectsLoading } = useCollection<Project>(projectsQuery);
   const projects = useMemo(() => projectsData || [], [projectsData]);
@@ -82,7 +82,7 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 4. Fetch tasks
+  // 4. Fetch tasks - GATED BY USER
   const globalTasksQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collectionGroup(db, 'tasks'));
@@ -118,12 +118,12 @@ export function useNexusStore() {
     );
   }, [allWorkspaceTasks, activeProject, globalSearchQuery]);
 
-  // 5. Members
+  // 5. Members - GATED BY USER
   const membersQuery = useMemoFirebase(() => {
     const wsId = activeWorkspaceId || activeWorkspace?.id;
-    if (!db || !wsId) return null;
+    if (!db || !user?.uid || !wsId) return null;
     return query(collection(db, 'workspaces', wsId, 'members'));
-  }, [db, activeWorkspaceId, activeWorkspace?.id]);
+  }, [db, user?.uid, activeWorkspaceId, activeWorkspace?.id]);
   
   const { data: membersData } = useCollection<WorkspaceMember>(membersQuery);
   const profiles = useMemo(() => membersData || [], [membersData]);
@@ -138,7 +138,7 @@ export function useNexusStore() {
         id: uid,
         userId: uid,
         role: role as any,
-        displayName: profile?.displayName || (isMe ? user.displayName : 'Pending...'),
+        displayName: profile?.displayName || (isMe ? user.displayName : 'Pending Sync...'),
         email: profile?.email || (isMe ? user.email : ''),
         avatarUrl: profile?.avatarUrl || (isMe ? user.photoURL : null),
       };
@@ -173,7 +173,7 @@ export function useNexusStore() {
     }
   };
 
-  const createWorkspace = useCallback((name: string, description: string) => {
+  const createWorkspace = useCallback(async (name: string, description: string) => {
     if (!db || !user) return null;
     const wsRef = doc(collection(db, 'workspaces'));
     const wsData: Workspace = {
@@ -193,7 +193,7 @@ export function useNexusStore() {
       id: user.uid,
       workspaceId: wsRef.id,
       userId: user.uid,
-      displayName: user.displayName || 'Anonymous',
+      displayName: user.displayName || 'User',
       email: user.email?.toLowerCase() || '',
       avatarUrl: user.photoURL || null,
     }, { merge: true });
