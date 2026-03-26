@@ -21,7 +21,7 @@ export default function Home() {
       setDoc(userRef, {
         id: user.uid,
         name: user.displayName || 'User',
-        email: user.email,
+        email: user.email?.toLowerCase() || '', // Normalize email to lowercase for easier searching
         avatarUrl: user.photoURL,
         updatedAt: new Date().toISOString()
       }, { merge: true });

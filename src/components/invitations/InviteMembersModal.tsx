@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 export function InviteMembersModal({ 
   isOpen, 
@@ -222,28 +223,37 @@ export function InviteMembersModal({
               </div>
 
               <div className="space-y-3 max-h-[250px] overflow-y-auto">
-                {searchResults.map(user => (
-                  <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={user.avatarUrl} />
-                        <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                {searchResults.map(user => {
+                  const isAlreadyMember = store.activeWorkspace?.memberRoles?.[user.id] !== undefined;
+                  return (
+                    <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={user.avatarUrl} />
+                          <AvatarFallback>{user.name?.charAt(0) || '?'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold">{user.name}</span>
+                          <span className="text-xs text-muted-foreground">{user.email}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {isAlreadyMember ? (
+                          <Badge variant="secondary">Already Member</Badge>
+                        ) : (
+                          <>
+                            <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'member')}>
+                              Add Member
+                            </Button>
+                            <Button size="sm" variant="secondary" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'lead')}>
+                              Add Lead
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'member')}>
-                        Add Member
-                      </Button>
-                      <Button size="sm" variant="secondary" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'lead')}>
-                        Add Lead
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {!isSearching && searchResults.length === 0 && searchEmail && (
                   <div className="text-center py-6 text-muted-foreground text-sm">
                     No results found for "{searchEmail}"
