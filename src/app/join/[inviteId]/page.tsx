@@ -65,26 +65,41 @@ export default function JoinPage() {
     fetchInvite();
   }, [db, inviteId]);
 
-  // Sync user profile to Firestore immediately upon login/detect
+  // Sync user profile and check existing membership
   useEffect(() => {
-    if (user && db) {
-      const userRef = doc(db, 'users', user.uid);
-      setDoc(userRef, {
-        id: user.uid,
-        name: user.displayName || 'User',
-        email: user.email?.toLowerCase() || '',
-        avatarUrl: user.photoURL,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    }
-  }, [user, db]);
+    const syncAndCheck = async () => {
+      if (user && db && invite) {
+        // Sync user profile first
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, {
+          id: user.uid,
+          name: user.displayName || 'User',
+          email: user.email?.toLowerCase() || '',
+          avatarUrl: user.photoURL,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        // Check if already a member
+        const wsRef = doc(db, 'workspaces', invite.workspaceId);
+        const wsSnap = await getDoc(wsRef);
+        if (wsSnap.exists()) {
+          const wsData = wsSnap.data();
+          if (wsData.memberRoles && wsData.memberRoles[user.uid]) {
+            setJoined(true);
+            setTimeout(() => router.push('/'), 1500);
+          }
+        }
+      }
+    };
+
+    syncAndCheck();
+  }, [user, db, invite, router]);
 
   const handleLogin = async () => {
     setError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      // After login, the component will re-render due to useUser() hook update
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') return;
       console.error("Login failed:", err);
@@ -106,33 +121,25 @@ export default function JoinPage() {
 
       const wsData = wsSnap.data();
       
-      // Check if already a member
-      if (wsData.memberRoles && wsData.memberRoles[user.uid]) {
-        router.push('/');
-        return;
-      }
-      
-      // Update workspace member roles (Requires update permission on workspace)
+      // Update workspace member roles
       const newRoles = { 
-        ...wsData.memberRoles, 
+        ...(wsData.memberRoles || {}), 
         [user.uid]: invite.role 
       };
-      await updateDoc(wsRef, { memberRoles: newRoles });
-
-      // Create member document (Requires create permission on members/{uid})
-      const memberRef = doc(db, 'workspaces', invite.workspaceId, 'members', user.uid);
-      await setDoc(memberRef, {
-        id: user.uid,
-        workspaceId: invite.workspaceId,
-        userId: user.uid,
-        displayName: user.displayName || 'Anonymous',
-        email: user.email || '',
-        avatarUrl: user.photoURL || null,
-      });
-
-      // Update usage count
-      const inviteRef = doc(db, 'invitations', inviteId as string);
-      await updateDoc(inviteRef, { usageCount: increment(1) });
+      
+      // Perform join operations
+      await Promise.all([
+        updateDoc(wsRef, { memberRoles: newRoles }),
+        setDoc(doc(db, 'workspaces', invite.workspaceId, 'members', user.uid), {
+          id: user.uid,
+          workspaceId: invite.workspaceId,
+          userId: user.uid,
+          displayName: user.displayName || 'Anonymous',
+          email: user.email || '',
+          avatarUrl: user.photoURL || null,
+        }, { merge: true }),
+        updateDoc(doc(db, 'invitations', inviteId as string), { usageCount: increment(1) })
+      ]);
 
       setJoined(true);
       setTimeout(() => router.push('/'), 1500);
@@ -224,8 +231,9 @@ export default function JoinPage() {
               )}
             </div>
           ) : (
-            <div className="flex justify-center py-4">
+            <div className="flex flex-col items-center justify-center py-4 gap-4">
                <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
+               <p className="text-sm text-muted-foreground">Success! Redirecting...</p>
             </div>
           )}
           

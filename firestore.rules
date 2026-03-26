@@ -50,16 +50,18 @@ service cloud.firestore {
 
     match /invitations/{inviteId} {
       allow get: if true;
-      allow list: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
-      allow create: if isSignedIn() && isWorkspaceAdmin(request.resource.data.workspaceId);
-      allow update, delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      // Allow update by joiners to increment usage count
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     match /workspaces/{workspaceId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isSignedIn();
-      // Allow update for any signed-in user to support the client-side joining process (updating memberRoles)
+      // Allow update for any signed-in user to support the client-side joining process
       allow update: if isSignedIn();
       allow delete: if isWorkspaceAdmin(workspaceId);
 
