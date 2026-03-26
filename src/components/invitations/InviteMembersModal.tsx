@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -78,11 +79,12 @@ export function InviteMembersModal({
   const handleSearch = async () => {
     if (!searchEmail) return;
     setIsSearching(true);
+    setSearchResults([]);
     try {
       const users = await store.searchUsersByEmail(searchEmail);
       setSearchResults(users);
       if (users.length === 0) {
-        toast({ title: 'No user found', description: 'User must have an account to be added directly.' });
+        toast({ title: 'No user found', description: 'Make sure the user has logged in to the app at least once.' });
       }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -210,7 +212,7 @@ export function InviteMembersModal({
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
-                    placeholder="Search by email..." 
+                    placeholder="Search by exact email..." 
                     className="pl-9" 
                     value={searchEmail}
                     onChange={(e) => setSearchEmail(e.target.value)}
@@ -222,7 +224,14 @@ export function InviteMembersModal({
                 </Button>
               </div>
 
-              <div className="space-y-3 max-h-[250px] overflow-y-auto">
+              <div className="space-y-3 max-h-[250px] overflow-y-auto min-h-[100px]">
+                {isSearching && (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="text-sm">Searching...</span>
+                  </div>
+                )}
+                
                 {searchResults.map(user => {
                   const isAlreadyMember = store.activeWorkspace?.memberRoles?.[user.id] !== undefined;
                   return (
@@ -254,8 +263,9 @@ export function InviteMembersModal({
                     </div>
                   );
                 })}
+
                 {!isSearching && searchResults.length === 0 && searchEmail && (
-                  <div className="text-center py-6 text-muted-foreground text-sm">
+                  <div className="text-center py-6 text-muted-foreground text-sm border border-dashed rounded-lg">
                     No results found for "{searchEmail}"
                   </div>
                 )}

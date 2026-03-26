@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -116,20 +117,17 @@ export function useNexusStore() {
 
   const searchUsersByEmail = async (email: string): Promise<User[]> => {
     if (!db || !email) return [];
-    const trimmedEmail = email.trim();
+    const searchEmail = email.trim().toLowerCase();
     const usersRef = collection(db, 'users');
     
-    // Search for both exact and lowercase to be safe
-    const q1 = query(usersRef, where('email', '==', trimmedEmail), limit(5));
-    const q2 = query(usersRef, where('email', '==', trimmedEmail.toLowerCase()), limit(5));
+    const q = query(
+      usersRef, 
+      where('email', '==', searchEmail), 
+      limit(5)
+    );
     
-    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-    
-    const usersMap = new Map<string, User>();
-    snap1.docs.forEach(doc => usersMap.set(doc.id, doc.data() as User));
-    snap2.docs.forEach(doc => usersMap.set(doc.id, doc.data() as User));
-    
-    return Array.from(usersMap.values());
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => doc.data() as User);
   };
 
   const createWorkspace = useCallback((name: string, description: string) => {
