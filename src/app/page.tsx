@@ -47,7 +47,7 @@ export default function Home() {
         avatarUrl: user.photoURL || null,
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => {
-        console.error("Failed to sync user profile", err);
+        // Silently handle profile sync errors to avoid UI disruption
       });
     }
   }, [user, db]);
@@ -60,7 +60,6 @@ export default function Home() {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') return;
-      console.error("Google Login failed", err);
       setError('Login failed: ' + (err.message || 'Please try again.'));
     } finally {
       setLoading(false);
@@ -81,7 +80,6 @@ export default function Home() {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      console.error("Email Auth failed", err);
       let message = "An error occurred during authentication.";
       
       if (err.code === 'auth/invalid-credential') {

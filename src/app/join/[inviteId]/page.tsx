@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -57,13 +58,9 @@ export default function JoinWorkspacePage() {
 
   // Listen for auth state changes
   useEffect(() => {
-    if (!auth) {
-      console.log('[JoinPage] Auth not ready');
-      return;
-    }
+    if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log('[JoinPage] Auth state changed:', currentUser?.email);
       setUser(currentUser);
       setAuthLoading(false);
     });
@@ -77,7 +74,6 @@ export default function JoinWorkspacePage() {
       if (!db || !inviteId) return;
 
       try {
-        console.log('[JoinPage] Fetching invitation:', inviteId);
         const inviteRef = doc(db, 'invitations', inviteId);
         const inviteSnap = await getDoc(inviteRef);
 
@@ -88,7 +84,6 @@ export default function JoinWorkspacePage() {
         }
 
         const data = inviteSnap.data();
-        console.log('[JoinPage] Invitation data:', data);
         
         if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
           setInviteError('This invitation has expired');
@@ -111,7 +106,6 @@ export default function JoinWorkspacePage() {
         setInvitation({ id: inviteSnap.id, ...data });
         setInviteLoading(false);
       } catch (error: any) {
-        console.error('[JoinPage] Error fetching invitation:', error);
         setInviteError('Failed to load invitation details');
         setInviteLoading(false);
       }
@@ -122,17 +116,14 @@ export default function JoinWorkspacePage() {
 
   const handleGoogleSignIn = async () => {
     if (signingIn) return;
-    console.log('[JoinPage] Starting Google Sign In');
     setSigningIn(true);
     setSignInError(null);
 
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      console.log('[JoinPage] Google Sign In success:', result.user.email);
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
-      console.error('[JoinPage] Google Sign In error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
         setSignInError(`Sign in failed: ${error.message}`);
       }
@@ -143,7 +134,6 @@ export default function JoinWorkspacePage() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[JoinPage] Starting Email Auth:', authMode);
     setSigningIn(true);
     setSignInError(null);
 
@@ -152,13 +142,10 @@ export default function JoinWorkspacePage() {
         if (!name.trim()) throw new Error('Name is required');
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: name });
-        console.log('[JoinPage] Email Sign Up success:', userCredential.user.email);
       } else {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        console.log('[JoinPage] Email Sign In success:', userCredential.user.email);
+        await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (error: any) {
-      console.error('[JoinPage] Email Auth error:', error);
       let message = 'Authentication failed.';
       
       if (error.code === 'auth/invalid-credential') {
@@ -181,7 +168,6 @@ export default function JoinWorkspacePage() {
 
   const handleJoinWorkspace = async () => {
     if (!user || !invitation || !db) return;
-    console.log('[JoinPage] Joining workspace:', invitation.workspaceId);
     setJoining(true);
 
     try {
@@ -230,19 +216,15 @@ export default function JoinWorkspacePage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      console.log('[JoinPage] Join successful, redirecting...');
       setJoined(true);
       setTimeout(() => router.push('/'), 1500);
       
     } catch (error: any) {
-      console.error('[JoinPage] Join error:', error);
       setInviteError('Failed to join: ' + (error.message || 'Check your permissions.'));
     } finally {
       setJoining(false);
     }
   };
-
-  console.log('[JoinPage] Render - user:', user?.email, 'authLoading:', authLoading);
 
   if (authLoading || (inviteLoading && !inviteError)) {
     return (
