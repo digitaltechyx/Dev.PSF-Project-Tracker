@@ -117,17 +117,31 @@ export function useNexusStore() {
 
   const searchUsersByEmail = async (email: string): Promise<User[]> => {
     if (!db || !email) return [];
-    const searchEmail = email.trim().toLowerCase();
+    
+    const searchEmail = email.trim();
+    const lowerSearchEmail = searchEmail.toLowerCase();
     const usersRef = collection(db, 'users');
     
-    const q = query(
-      usersRef, 
-      where('email', '==', searchEmail), 
-      limit(5)
-    );
-    
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => doc.data() as User);
+    try {
+      // Search for both the raw input and normalized lowercase version
+      const q = query(
+        usersRef, 
+        where('email', 'in', [searchEmail, lowerSearchEmail]), 
+        limit(5)
+      );
+      
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id // Ensure ID is mapped from document ID
+        } as User;
+      });
+    } catch (error) {
+      console.error("Error searching users:", error);
+      return [];
+    }
   };
 
   const createWorkspace = useCallback((name: string, description: string) => {
