@@ -50,11 +50,9 @@ service cloud.firestore {
 
     match /invitations/{inviteId} {
       allow get: if true;
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      // Allow update by joiners to increment usage count
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow list: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
+      allow create: if isSignedIn() && isWorkspaceAdmin(request.resource.data.workspaceId);
+      allow update, delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
     }
 
     match /workspaces/{workspaceId} {
@@ -67,8 +65,8 @@ service cloud.firestore {
 
       match /members/{memberUserId} {
         allow read: if isSignedIn();
-        // Allow users to create their own member record during join flow
-        allow create: if isSignedIn() && request.auth.uid == memberUserId;
+        // Allow users to create their own member record OR admins to add them directly
+        allow create: if (isSignedIn() && request.auth.uid == memberUserId) || isWorkspaceAdmin(workspaceId);
         allow update, delete: if isWorkspaceAdmin(workspaceId);
       }
 
