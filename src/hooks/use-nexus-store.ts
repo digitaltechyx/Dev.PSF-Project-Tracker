@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -168,7 +169,7 @@ export function useNexusStore() {
   };
 
   const createWorkspace = useCallback((name: string, description: string) => {
-    if (!db || !user) return;
+    if (!db || !user) return null;
     const wsRef = doc(collection(db, 'workspaces'));
     const wsData: Workspace = {
       id: wsRef.id,
@@ -191,7 +192,8 @@ export function useNexusStore() {
       email: user.email?.toLowerCase() || '',
       avatarUrl: user.photoURL || null,
     }, { merge: true });
-    setActiveWorkspaceId(wsRef.id);
+    
+    return wsRef.id;
   }, [db, user]);
 
   const directAddMember = useCallback((targetUser: User, role: 'member' | 'lead') => {
@@ -238,34 +240,36 @@ export function useNexusStore() {
     return inviteRef.id;
   }, [db, activeWorkspace, isOwner, user]);
 
-  const createProject = useCallback((name: string, description: string) => {
-    const wsId = activeWorkspace?.id;
-    if (!db || !wsId || !isAdmin) return;
+  const createProject = useCallback((wsId: string, name: string, description: string) => {
+    if (!db || !wsId) return null;
     const projRef = doc(collection(db, 'workspaces', wsId, 'projects'));
-    setDocumentNonBlocking(projRef, {
+    const projData = {
       id: projRef.id,
       workspaceId: wsId,
       name,
-      description,
+      description: description || '',
       color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    }, { merge: true });
-  }, [db, activeWorkspace, isAdmin]);
+    };
+    setDocumentNonBlocking(projRef, projData, { merge: true });
+    return projRef.id;
+  }, [db]);
 
-  const createTask = useCallback((projectId: string, data: any) => {
-    const wsId = activeWorkspace?.id;
-    if (!db || !wsId || !isAdmin) return;
+  const createTask = useCallback((wsId: string, projectId: string, data: any) => {
+    if (!db || !wsId || !projectId) return null;
     const taskRef = doc(collection(db, 'workspaces', wsId, 'projects', projectId, 'tasks'));
-    setDocumentNonBlocking(taskRef, {
+    const taskData = {
       id: taskRef.id,
       workspaceId: wsId,
       projectId,
       ...data,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    }, { merge: true });
-  }, [db, activeWorkspace, isAdmin]);
+    };
+    setDocumentNonBlocking(taskRef, taskData, { merge: true });
+    return taskRef.id;
+  }, [db]);
 
   return {
     currentUser: user ? { id: user.uid, name: user.displayName || 'User', email: user.email || '', avatarUrl: user.photoURL || null } : null,
