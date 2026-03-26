@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 /**
  * JoinWorkspacePage handles the invitation acceptance process.
- * It uses a dedicated auth listener to ensure the UI reacts instantly after login.
+ * Includes debug logging to track authentication state transitions.
  */
 export default function JoinWorkspacePage() {
   const params = useParams();
@@ -49,6 +49,7 @@ export default function JoinWorkspacePage() {
   // 1. Listen for auth state changes to transition UI from login to join
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log('[JoinPage] Auth state changed:', currentUser?.email);
       setUser(currentUser);
       setAuthLoading(false);
     });
@@ -112,11 +113,12 @@ export default function JoinWorkspacePage() {
     try {
       const provider = new GoogleAuthProvider();
       // Explicitly awaiting ensures we catch specific errors like popup-closed
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      console.log('[JoinPage] Sign in successful:', result.user.email);
     } catch (error: any) {
       // Gracefully handle "popup closed by user" without crashing the app
       if (error.code === 'auth/popup-closed-by-user') {
-        // Just stop the loading state, the user can try again
+        console.log('[JoinPage] Sign in cancelled by user');
       } else {
         console.error('Sign in error:', error);
         setInviteError('Sign in failed: ' + (error.message || 'Please try again.'));
@@ -188,6 +190,8 @@ export default function JoinWorkspacePage() {
       setJoining(false);
     }
   };
+
+  console.log('[JoinPage] Render - user:', user?.email, 'authLoading:', authLoading);
 
   if (authLoading || (inviteLoading && !inviteError)) {
     return (
