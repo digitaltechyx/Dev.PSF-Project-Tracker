@@ -49,7 +49,7 @@ service cloud.firestore {
     }
 
     match /invitations/{inviteId} {
-      allow get: if true; // Public for token lookup
+      allow get: if true;
       allow list: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
       allow create: if isSignedIn() && isWorkspaceAdmin(request.resource.data.workspaceId);
       allow update, delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);

@@ -14,7 +14,8 @@ const iconMap = {
 };
 
 export function NotificationsView({ store }: { store: any }) {
-  const notifications = store.workspaceNotifications;
+  // Defensive check for notifications array
+  const notifications = store?.workspaceNotifications || [];
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -39,13 +40,13 @@ export function NotificationsView({ store }: { store: any }) {
                 )}
               >
                 <Avatar className="h-10 w-10 mt-1">
-                  <AvatarImage src={notif.user.avatar} />
-                  <AvatarFallback>{notif.user.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={notif.user?.avatar} />
+                  <AvatarFallback>{notif.user?.name?.charAt(0) || '?'}</AvatarFallback>
                 </Avatar>
                 
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{notif.user.name}</span>
+                    <span className="font-semibold text-sm">{notif.user?.name || 'User'}</span>
                     <span className="text-sm text-muted-foreground">{notif.message}</span>
                   </div>
                   

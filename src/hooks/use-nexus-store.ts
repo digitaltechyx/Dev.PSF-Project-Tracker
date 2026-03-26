@@ -18,10 +18,8 @@ import {
   where,
   getDocs,
   limit,
-  Timestamp,
-  increment
 } from 'firebase/firestore';
-import { Workspace, Project, Task, WorkspaceMember, User, Invitation, Status, Priority } from '@/lib/types';
+import { Workspace, Project, Task, WorkspaceMember, User, Invitation } from '@/lib/types';
 
 export function useNexusStore() {
   const { user } = useUser();
@@ -212,6 +210,7 @@ export function useNexusStore() {
     projectTasks,
     myTasks,
     workspaceMembers: members,
+    workspaceNotifications: [], // Fallback to prevent crashes
     globalSearchQuery,
     isTasksLoading,
     isProjectsLoading,
