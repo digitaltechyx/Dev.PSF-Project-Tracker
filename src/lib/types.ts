@@ -27,7 +27,6 @@ export interface WorkspaceMember {
   displayName: string;
   email: string;
   avatarUrl?: string | null;
-  memberRoles?: Record<string, 'owner' | 'admin' | 'member'>;
 }
 
 export interface Project {
@@ -66,16 +65,18 @@ export interface Comment {
   createdAt: string;
 }
 
-export interface Notification {
+export interface Invitation {
   id: string;
   workspaceId: string;
-  type: 'comment' | 'status' | 'assignment' | 'invite';
-  user: {
-    name: string;
-    avatar: string;
-  };
-  message: string;
-  content?: string;
-  time: string;
-  read: boolean;
+  workspaceName: string;
+  role: 'member' | 'admin';
+  invitedBy: string;
+  invitedByName: string;
+  type: 'link' | 'direct';
+  email?: string; // Only for direct invites
+  status: 'active' | 'accepted' | 'expired' | 'cancelled';
+  usageCount: number;
+  maxUses: number | 'unlimited';
+  createdAt: string;
+  expiresAt: string | null;
 }

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -11,9 +10,24 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isMemberOfWs(wsId) {
-      let ws = get(/databases/$(database)/documents/workspaces/$(wsId)).data;
-      return isSignedIn() && (ws.ownerUserId == request.auth.uid || (ws.memberRoles != null && ws.memberRoles[request.auth.uid] != null));
+    function getWorkspace(wsId) {
+      return get(/databases/$(database)/documents/workspaces/$(wsId)).data;
+    }
+
+    function isWorkspaceMember(wsId) {
+      let ws = getWorkspace(wsId);
+      return isSignedIn() && (
+        ws.ownerUserId == request.auth.uid || 
+        (ws.memberRoles != null && ws.memberRoles[request.auth.uid] != null)
+      );
+    }
+
+    function isWorkspaceAdmin(wsId) {
+      let ws = getWorkspace(wsId);
+      return isSignedIn() && (
+        ws.ownerUserId == request.auth.uid || 
+        (ws.memberRoles != null && (ws.memberRoles[request.auth.uid] == 'admin' || ws.memberRoles[request.auth.uid] == 'owner'))
+      );
     }
 
     // --- COLLECTION GROUP RULES ---
@@ -26,35 +40,43 @@ service cloud.firestore {
       allow read: if isSignedIn();
     }
 
-    // --- HIERARCHICAL COLLECTION RULES ---
+    // --- HIERARCHICAL RULES ---
 
     match /users/{userId} {
-      allow get, create, update: if isOwner(userId);
-      allow list: if false; 
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 5;
+      allow create, update: if isOwner(userId);
+    }
+
+    match /invitations/{inviteId} {
+      allow get: if true; // Public for token lookup
+      allow list: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
+      allow create: if isSignedIn() && isWorkspaceAdmin(request.resource.data.workspaceId);
+      allow update, delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
     }
 
     match /workspaces/{workspaceId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isMemberOfWs(workspaceId);
+      allow update, delete: if isWorkspaceAdmin(workspaceId);
 
       match /members/{memberUserId} {
         allow read: if isSignedIn();
-        allow write: if isMemberOfWs(workspaceId);
+        allow write: if isWorkspaceAdmin(workspaceId);
       }
 
       match /projects/{projectId} {
         allow read: if isSignedIn();
-        allow write: if isMemberOfWs(workspaceId);
+        allow write: if isWorkspaceAdmin(workspaceId);
 
         match /tasks/{taskId} {
           allow read: if isSignedIn();
-          allow write: if isMemberOfWs(workspaceId);
+          allow write: if isWorkspaceMember(workspaceId);
 
           match /comments/{commentId} {
             allow read: if isSignedIn();
-            allow write: if isMemberOfWs(workspaceId);
+            allow write: if isWorkspaceMember(workspaceId);
           }
         }
       }

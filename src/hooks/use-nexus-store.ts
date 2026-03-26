@@ -14,9 +14,14 @@ import {
   collection, 
   query, 
   doc, 
-  collectionGroup
+  collectionGroup,
+  where,
+  getDocs,
+  limit,
+  Timestamp,
+  increment
 } from 'firebase/firestore';
-import { Workspace, Project, Task, WorkspaceMember, Status, Priority } from '@/lib/types';
+import { Workspace, Project, Task, WorkspaceMember, User, Invitation, Status, Priority } from '@/lib/types';
 
 export function useNexusStore() {
   const { user } = useUser();
@@ -25,7 +30,6 @@ export function useNexusStore() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  // 1. Workspaces - Hierarchical read for basic access
   const workspacesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(collection(db, 'workspaces'));
@@ -53,7 +57,6 @@ export function useNexusStore() {
     }
   }, [activeWorkspace, activeWorkspaceId]);
 
-  // 2. Projects - Direct hierarchical query
   const projectsQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id) return null;
     return query(collection(db, 'workspaces', activeWorkspace.id, 'projects'));
@@ -67,28 +70,23 @@ export function useNexusStore() {
     [projects, activeProjectId]
   );
 
-  // 3. Global Task Stream - No filters to avoid index requirements
   const globalTasksQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
-    // We fetch all tasks and filter in memory to guarantee visibility without manual indexes
     return query(collectionGroup(db, 'tasks'));
   }, [db, user?.uid]);
   
   const { data: globalTasksData, isLoading: isTasksLoading } = useCollection<Task>(globalTasksQuery);
   
-  // Tasks filtered for the active workspace
   const allWorkspaceTasks = useMemo(() => {
     if (!globalTasksData || !activeWorkspace?.id) return [];
     return globalTasksData.filter(t => t.workspaceId === activeWorkspace.id);
   }, [globalTasksData, activeWorkspace?.id]);
 
-  // Tasks assigned to the current user (My Tasks)
   const myTasks = useMemo(() => {
     if (!user?.uid) return [];
     return allWorkspaceTasks.filter(t => t.assigneeUserId === user.uid);
   }, [allWorkspaceTasks, user?.uid]);
 
-  // 4. Active Project Tasks - Direct path for performance
   const projectTasks = useMemo(() => {
     if (!activeProject) return [];
     const tasks = allWorkspaceTasks.filter(t => t.projectId === activeProject.id);
@@ -100,7 +98,6 @@ export function useNexusStore() {
     );
   }, [allWorkspaceTasks, activeProject, globalSearchQuery]);
 
-  // 5. Members
   const membersQuery = useMemoFirebase(() => {
     if (!db || !activeWorkspace?.id) return null;
     return query(collection(db, 'workspaces', activeWorkspace.id, 'members'));
@@ -118,6 +115,14 @@ export function useNexusStore() {
   const selectProject = useCallback((id: string | null) => {
     setActiveProjectId(id);
   }, []);
+
+  const searchUsersByEmail = async (email: string): Promise<User[]> => {
+    if (!db || !email) return [];
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', email.toLowerCase().trim()), limit(5));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => doc.data() as User);
+  };
 
   const createWorkspace = useCallback((name: string, description: string) => {
     if (!db || !user) return;
@@ -150,115 +155,63 @@ export function useNexusStore() {
     setActiveWorkspaceId(wsRef.id);
   }, [db, user]);
 
-  const createProject = useCallback((name: string, description: string) => {
-    if (!db || !activeWorkspace?.id || !user) return;
-    const projRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects'));
+  const directAddMember = useCallback((targetUser: User, role: 'member' | 'admin') => {
+    if (!db || !activeWorkspace || !user) return;
     
-    const projData: Project = {
-      id: projRef.id,
-      workspaceId: activeWorkspace.id,
-      name,
-      description: description || '',
-      color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
-      memberRoles: activeWorkspace.memberRoles || { [user.uid]: 'owner' },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    const newRoles = { 
+      ...activeWorkspace.memberRoles, 
+      [targetUser.id]: role 
     };
-
-    setDocumentNonBlocking(projRef, projData, { merge: true });
-  }, [db, activeWorkspace, user]);
-
-  const createTask = useCallback((projectId: string, taskData: Partial<Task>) => {
-    if (!db || !activeWorkspace?.id || !user) return;
     
-    const taskRef = doc(collection(db, 'workspaces', activeWorkspace.id, 'projects', projectId, 'tasks'));
-    
-    const newTask: Task = {
-      id: taskRef.id,
-      workspaceId: activeWorkspace.id,
-      projectId,
-      title: taskData.title || 'Untitled Task',
-      description: taskData.description || '',
-      status: taskData.status || 'todo',
-      priority: taskData.priority || 'medium',
-      dueDate: taskData.dueDate || null,
-      assigneeUserId: taskData.assigneeUserId || user.uid,
-      tags: taskData.tags || [],
-      memberRoles: activeWorkspace.memberRoles || { [user.uid]: 'owner' },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const wsRef = doc(db, 'workspaces', activeWorkspace.id);
+    updateDocumentNonBlocking(wsRef, { memberRoles: newRoles });
 
-    setDocumentNonBlocking(taskRef, newTask, { merge: true });
-  }, [db, activeWorkspace, user]);
-
-  const updateTask = useCallback((taskId: string, data: Partial<Task>) => {
-    if (!db) return;
-    const task = allWorkspaceTasks.find(t => t.id === taskId);
-    if (!task) return;
-    
-    const taskRef = doc(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', taskId);
-    updateDocumentNonBlocking(taskRef, { 
-      ...data, 
-      updatedAt: new Date().toISOString() 
-    });
-  }, [db, allWorkspaceTasks]);
-
-  const deleteTask = useCallback((taskId: string) => {
-    const task = allWorkspaceTasks.find(t => t.id === taskId);
-    if (!db || !task) return;
-    const taskRef = doc(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', taskId);
-    deleteDocumentNonBlocking(taskRef);
-  }, [db, allWorkspaceTasks]);
-
-  const addMockMember = useCallback((name: string, email: string) => {
-    if (!db || !activeWorkspace?.id || !user) return;
-    const tempId = Math.random().toString(36).substring(7);
-    const memberRef = doc(db, 'workspaces', activeWorkspace.id, 'members', tempId);
-    
+    const memberRef = doc(db, 'workspaces', activeWorkspace.id, 'members', targetUser.id);
     setDocumentNonBlocking(memberRef, {
-      id: tempId,
+      id: targetUser.id,
       workspaceId: activeWorkspace.id,
-      userId: tempId,
-      displayName: name,
-      email,
-      avatarUrl: `https://picsum.photos/seed/${tempId}/100/100`,
+      userId: targetUser.id,
+      displayName: targetUser.name,
+      email: targetUser.email,
+      avatarUrl: targetUser.avatarUrl,
     }, { merge: true });
   }, [db, activeWorkspace, user]);
 
-  const removeMember = useCallback((memberId: string) => {
-    if (!db || !activeWorkspace?.id) return;
-    const memberRef = doc(db, 'workspaces', activeWorkspace.id, 'members', memberId);
-    deleteDocumentNonBlocking(memberRef);
-  }, [db, activeWorkspace]);
-
-  const addComment = useCallback((taskId: string, body: string) => {
-    const task = allWorkspaceTasks.find(t => t.id === taskId);
-    if (!db || !task || !user) return;
-    const commentRef = doc(collection(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', taskId, 'comments'));
+  const createInviteLink = useCallback((options: { role: 'member' | 'admin', expiresDays: number | 'never', maxUses: number | 'unlimited' }) => {
+    if (!db || !activeWorkspace || !user) return;
     
-    setDocumentNonBlocking(commentRef, {
-      id: commentRef.id,
-      taskId,
-      authorUserId: user.uid,
-      workspaceId: task.workspaceId,
-      body,
-      memberRoles: task.memberRoles,
+    const inviteRef = doc(collection(db, 'invitations'));
+    const expiresAt = options.expiresDays === 'never' ? null : new Date(Date.now() + options.expiresDays * 24 * 60 * 60 * 1000).toISOString();
+    
+    const inviteData: Invitation = {
+      id: inviteRef.id,
+      workspaceId: activeWorkspace.id,
+      workspaceName: activeWorkspace.name,
+      role: options.role,
+      invitedBy: user.uid,
+      invitedByName: user.displayName || 'User',
+      type: 'link',
+      status: 'active',
+      usageCount: 0,
+      maxUses: options.maxUses,
       createdAt: new Date().toISOString(),
-    }, { merge: true });
-  }, [db, allWorkspaceTasks, user]);
+      expiresAt,
+    };
+
+    setDocumentNonBlocking(inviteRef, inviteData, { merge: true });
+    return inviteRef.id;
+  }, [db, activeWorkspace, user]);
 
   return {
     currentUser: user ? { id: user.uid, name: user.displayName || 'User', email: user.email || '', avatarUrl: user.photoURL || null } : null,
     workspaces,
-    activeWorkspace: activeWorkspace || { name: 'Loading...', color: '#ccc', memberRoles: {} },
+    activeWorkspace: activeWorkspace || { id: '', name: 'Loading...', color: '#ccc', memberRoles: {}, ownerUserId: '' },
     workspaceProjects: projects,
     activeProject,
     allWorkspaceTasks,
     projectTasks,
     myTasks,
     workspaceMembers: members,
-    workspaceNotifications: [],
     globalSearchQuery,
     isTasksLoading,
     isProjectsLoading,
@@ -267,12 +220,39 @@ export function useNexusStore() {
     switchWorkspace,
     selectProject,
     createWorkspace,
-    createProject,
-    createTask,
-    updateTask,
-    deleteTask,
-    addMockMember,
-    removeMember,
-    addComment,
+    searchUsersByEmail,
+    directAddMember,
+    createInviteLink,
+    updateTask: (taskId: string, data: Partial<Task>) => {
+      if (!db) return;
+      const t = allWorkspaceTasks.find(x => x.id === taskId);
+      if (t) {
+        const ref = doc(db, 'workspaces', t.workspaceId, 'projects', t.projectId, 'tasks', t.id);
+        updateDocumentNonBlocking(ref, { ...data, updatedAt: new Date().toISOString() });
+      }
+    },
+    deleteTask: (taskId: string) => {
+      if (!db) return;
+      const t = allWorkspaceTasks.find(x => x.id === taskId);
+      if (t) {
+        const ref = doc(db, 'workspaces', t.workspaceId, 'projects', t.projectId, 'tasks', t.id);
+        deleteDocumentNonBlocking(ref);
+      }
+    },
+    addComment: (taskId: string, body: string) => {
+      if (!db || !user) return;
+      const t = allWorkspaceTasks.find(x => x.id === taskId);
+      if (t) {
+        const ref = doc(collection(db, 'workspaces', t.workspaceId, 'projects', t.projectId, 'tasks', t.id, 'comments'));
+        setDocumentNonBlocking(ref, {
+          id: ref.id,
+          taskId: t.id,
+          authorUserId: user.uid,
+          body,
+          memberRoles: t.memberRoles,
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
+      }
+    }
   };
 }
