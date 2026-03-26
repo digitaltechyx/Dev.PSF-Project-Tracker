@@ -75,12 +75,14 @@ export function MembersView({ store, onInviteClick, isAdmin }: MembersViewProps)
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="font-semibold text-sm flex items-center gap-2">
-                        {member.displayName || 'Pending Sync...'}
+                        {member.displayName}
                         {userId === currentUser?.id && (
                           <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase">You</span>
                         )}
                       </span>
-                      <span className="text-xs text-muted-foreground">{member.email || 'Initializing...'}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {member.email || (member.displayName === 'Pending Sync...' ? 'Initializing...' : 'No email provided')}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-6">

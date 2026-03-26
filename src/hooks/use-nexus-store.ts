@@ -19,9 +19,7 @@ import {
   where,
   getDocs,
   limit,
-  orderBy,
-  startAt,
-  endAt
+  orderBy
 } from 'firebase/firestore';
 import { Workspace, Project, Task, WorkspaceMember, User, Invitation } from '@/lib/types';
 
@@ -110,7 +108,7 @@ export function useNexusStore() {
   // 5. Fetch member profile documents for details
   const membersQuery = useMemoFirebase(() => {
     const wsId = activeWorkspaceId || activeWorkspace?.id;
-    if (!db || !wsId) return null;
+    if (!db || !wsId || wsId === '') return null;
     return query(collection(db, 'workspaces', wsId, 'members'));
   }, [db, activeWorkspaceId, activeWorkspace?.id]);
   
@@ -119,17 +117,22 @@ export function useNexusStore() {
 
   // 6. DERIVED TEAM LIST: Combine memberRoles (truth) with profiles (details)
   const workspaceMembers = useMemo(() => {
-    if (!activeWorkspace) return [];
+    if (!activeWorkspace || !activeWorkspace.id) return [];
     const roles = activeWorkspace.memberRoles || {};
     return Object.entries(roles).map(([uid, role]) => {
-      const profile = profiles.find(p => p.userId === uid || p.id === uid);
+      // Robust lookup by checking both doc ID and userId field
+      const profile = profiles.find(p => p.id === uid || p.userId === uid);
+      
+      // Always fallback to current user info for better UX
+      const isMe = uid === user?.uid;
+      
       return {
         id: uid,
         userId: uid,
         role: role as 'owner' | 'lead' | 'member',
-        displayName: profile?.displayName || (uid === user?.uid ? user.displayName : 'Pending...'),
-        email: profile?.email || '',
-        avatarUrl: profile?.avatarUrl || null,
+        displayName: profile?.displayName || (isMe ? user.displayName : 'Pending Sync...'),
+        email: profile?.email || (isMe ? user.email : ''),
+        avatarUrl: profile?.avatarUrl || (isMe ? user.photoURL : null),
       };
     });
   }, [activeWorkspace, profiles, user]);
@@ -149,7 +152,6 @@ export function useNexusStore() {
     const usersRef = collection(db, 'users');
     const term = queryText.trim().toLowerCase();
     try {
-      // Direct exact match first, then fall back to prefix matching
       const q = query(
         usersRef, 
         where('email', '>=', term),
@@ -258,7 +260,7 @@ export function useNexusStore() {
     allWorkspaceTasks,
     projectTasks,
     myTasks,
-    workspaceMembers, // Now returns the derived team list
+    workspaceMembers,
     workspaceNotifications: [],
     globalSearchQuery,
     isTasksLoading,
