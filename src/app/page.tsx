@@ -1,4 +1,3 @@
-
 "use client";
 
 import { NexusShell } from '@/components/NexusShell';
@@ -15,18 +14,19 @@ export default function Home() {
   const db = useFirestore();
   const [error, setError] = useState<string | null>(null);
 
-  // Ensure user document exists in Firestore immediately upon login.
-  // This is required for security rules to validate the user's identity path.
+  // Synchronize user profile with Firestore on every login
   useEffect(() => {
     if (user && db) {
       const userRef = doc(db, 'users', user.uid);
       setDoc(userRef, {
         id: user.uid,
         name: user.displayName || 'User',
-        email: user.email?.toLowerCase() || '', // Normalize email to lowercase for easier searching
+        email: user.email?.toLowerCase() || '',
         avatarUrl: user.photoURL,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }, { merge: true }).catch(err => {
+        console.error("Failed to sync user profile", err);
+      });
     }
   }, [user, db]);
 

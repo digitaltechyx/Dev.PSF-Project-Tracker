@@ -47,7 +47,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && request.query.limit <= 5;
+      allow list: if isSignedIn();
       allow create, update: if isSignedIn() && request.auth.uid == userId;
     }
 
@@ -64,14 +64,13 @@ service cloud.firestore {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isSignedIn();
-      // Only owner can delete workspace
       allow delete: if isWorkspaceOwner(workspaceId);
-      // Allow update for joining and role management
+      // Allow update for joining (adding role)
       allow update: if isSignedIn();
 
       match /members/{memberUserId} {
         allow read: if isSignedIn();
-        // Allow users to join themselves, or owners/admins to add them
+        // Allow users to join themselves, or admins to add them
         allow create: if (isSignedIn() && request.auth.uid == memberUserId) || isWorkspaceAdmin(workspaceId);
         // Only owner can manage members
         allow update, delete: if isWorkspaceOwner(workspaceId);

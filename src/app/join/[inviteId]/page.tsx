@@ -66,38 +66,27 @@ export default function JoinPage() {
     fetchInvite();
   }, [db, inviteId]);
 
-  // 2. Sync user profile and check existing membership automatically when logged in
+  // 2. Automatic redirect if already a member
   useEffect(() => {
-    const syncAndCheck = async () => {
+    const checkMembership = async () => {
       if (user && db && invite && !joined) {
         try {
-          // Sync user profile first (essential for search/roles)
-          const userRef = doc(db, 'users', user.uid);
-          await setDoc(userRef, {
-            id: user.uid,
-            name: user.displayName || 'User',
-            email: user.email?.toLowerCase() || '',
-            avatarUrl: user.photoURL,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-
-          // Check if already a member
           const wsRef = doc(db, 'workspaces', invite.workspaceId);
           const wsSnap = await getDoc(wsRef);
           if (wsSnap.exists()) {
             const wsData = wsSnap.data();
             if (wsData.memberRoles && wsData.memberRoles[user.uid]) {
               setJoined(true);
-              setTimeout(() => router.push('/'), 1500);
+              setTimeout(() => router.push('/'), 1000);
             }
           }
         } catch (e) {
-          console.error("Sync error:", e);
+          console.error("Check membership error:", e);
         }
       }
     };
 
-    syncAndCheck();
+    checkMembership();
   }, [user, db, invite, joined, router]);
 
   const handleLogin = async () => {
@@ -106,7 +95,8 @@ export default function JoinPage() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      // The useUser hook will trigger a re-render automatically once auth state changes
+      // After successful login, isLoggingIn state update and useUser hook re-render 
+      // will transition the UI to the "Join" state automatically.
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         setIsLoggingIn(false);
@@ -114,6 +104,7 @@ export default function JoinPage() {
       }
       console.error("Login failed:", err);
       setError('Login failed: ' + (err.message || 'Please try again.'));
+    } finally {
       setIsLoggingIn(false);
     }
   };
@@ -123,6 +114,17 @@ export default function JoinPage() {
     setJoining(true);
     setError(null);
     try {
+      // 1. First sync user profile (ensures user exists in /users for rules)
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        id: user.uid,
+        name: user.displayName || 'User',
+        email: user.email?.toLowerCase() || '',
+        avatarUrl: user.photoURL,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // 2. Get Workspace data for role update
       const wsRef = doc(db, 'workspaces', invite.workspaceId);
       const wsSnap = await getDoc(wsRef);
       
@@ -131,17 +133,12 @@ export default function JoinPage() {
       }
 
       const wsData = wsSnap.data();
-      
-      // Update workspace member roles map
       const newRoles = { 
         ...(wsData.memberRoles || {}), 
         [user.uid]: invite.role 
       };
       
-      // Perform join operations in batch
-      // 1. Add role to workspace doc
-      // 2. Create profile doc in members subcollection (using user.uid as doc ID)
-      // 3. Increment invitation usage
+      // 3. Perform join operations
       await Promise.all([
         updateDoc(wsRef, { memberRoles: newRoles }),
         setDoc(doc(db, 'workspaces', invite.workspaceId, 'members', user.uid), {
@@ -156,7 +153,7 @@ export default function JoinPage() {
       ]);
 
       setJoined(true);
-      setTimeout(() => router.push('/'), 1500);
+      setTimeout(() => router.push('/'), 1000);
     } catch (err: any) {
       console.error("Join failed:", err);
       setError('Failed to join workspace: ' + (err.message || 'Permissions error.'));
@@ -165,12 +162,12 @@ export default function JoinPage() {
     }
   };
 
-  if (loading || (isUserLoading && !user) || (user && isLoggingIn && !invite)) {
+  if (loading || (isUserLoading && !user)) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Preparing your invitation...</p>
+          <p className="text-sm text-muted-foreground">Checking invitation...</p>
         </div>
       </div>
     );
@@ -185,12 +182,12 @@ export default function JoinPage() {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold font-headline">
-              {joined ? 'Welcome to the team!' : 'Join Workspace'}
+              {joined ? 'Welcome!' : 'Join Workspace'}
             </CardTitle>
             <CardDescription>
               {error ? 'There was an issue with your invitation' : 
-               joined ? 'Redirecting you to the dashboard...' : 
-               invite ? `You've been invited to join ${invite.workspaceName}` : 'Checking invitation...'}
+               joined ? 'Redirecting to your new dashboard...' : 
+               invite ? `You've been invited to join ${invite.workspaceName}` : 'Preparing invitation...'}
             </CardDescription>
           </div>
         </CardHeader>
@@ -220,7 +217,7 @@ export default function JoinPage() {
 
               {!user ? (
                 <div className="space-y-4">
-                  <p className="text-xs text-center text-muted-foreground">You must be signed in to accept this invitation.</p>
+                  <p className="text-xs text-center text-muted-foreground">Sign in to accept this invitation.</p>
                   <Button className="w-full gap-2 h-11" onClick={handleLogin} disabled={isLoggingIn}>
                     {isLoggingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
                     {isLoggingIn ? 'Signing in...' : 'Sign in with Google'}
@@ -249,7 +246,7 @@ export default function JoinPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-4 gap-4">
                <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
-               <p className="text-sm text-muted-foreground">Success! Setting up your workspace...</p>
+               <p className="text-sm text-muted-foreground">Success! Setting up your space...</p>
             </div>
           )}
           
