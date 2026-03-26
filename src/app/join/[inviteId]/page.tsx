@@ -18,11 +18,12 @@ export default function JoinPage() {
   
   const [invite, setInvite] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch invitation details
+  // 1. Fetch invitation details
   useEffect(() => {
     const fetchInvite = async () => {
       if (!db || !inviteId) return;
@@ -65,45 +66,55 @@ export default function JoinPage() {
     fetchInvite();
   }, [db, inviteId]);
 
-  // Sync user profile and check existing membership
+  // 2. Sync user profile and check existing membership automatically when logged in
   useEffect(() => {
     const syncAndCheck = async () => {
-      if (user && db && invite) {
-        // Sync user profile first
-        const userRef = doc(db, 'users', user.uid);
-        await setDoc(userRef, {
-          id: user.uid,
-          name: user.displayName || 'User',
-          email: user.email?.toLowerCase() || '',
-          avatarUrl: user.photoURL,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
+      if (user && db && invite && !joined) {
+        try {
+          // Sync user profile first (essential for search/roles)
+          const userRef = doc(db, 'users', user.uid);
+          await setDoc(userRef, {
+            id: user.uid,
+            name: user.displayName || 'User',
+            email: user.email?.toLowerCase() || '',
+            avatarUrl: user.photoURL,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
 
-        // Check if already a member
-        const wsRef = doc(db, 'workspaces', invite.workspaceId);
-        const wsSnap = await getDoc(wsRef);
-        if (wsSnap.exists()) {
-          const wsData = wsSnap.data();
-          if (wsData.memberRoles && wsData.memberRoles[user.uid]) {
-            setJoined(true);
-            setTimeout(() => router.push('/'), 1500);
+          // Check if already a member
+          const wsRef = doc(db, 'workspaces', invite.workspaceId);
+          const wsSnap = await getDoc(wsRef);
+          if (wsSnap.exists()) {
+            const wsData = wsSnap.data();
+            if (wsData.memberRoles && wsData.memberRoles[user.uid]) {
+              setJoined(true);
+              setTimeout(() => router.push('/'), 1500);
+            }
           }
+        } catch (e) {
+          console.error("Sync error:", e);
         }
       }
     };
 
     syncAndCheck();
-  }, [user, db, invite, router]);
+  }, [user, db, invite, joined, router]);
 
   const handleLogin = async () => {
     setError(null);
+    setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      // The useUser hook will trigger a re-render automatically once auth state changes
     } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') return;
+      if (err.code === 'auth/popup-closed-by-user') {
+        setIsLoggingIn(false);
+        return;
+      }
       console.error("Login failed:", err);
       setError('Login failed: ' + (err.message || 'Please try again.'));
+      setIsLoggingIn(false);
     }
   };
 
@@ -121,13 +132,16 @@ export default function JoinPage() {
 
       const wsData = wsSnap.data();
       
-      // Update workspace member roles
+      // Update workspace member roles map
       const newRoles = { 
         ...(wsData.memberRoles || {}), 
         [user.uid]: invite.role 
       };
       
-      // Perform join operations
+      // Perform join operations in batch
+      // 1. Add role to workspace doc
+      // 2. Create profile doc in members subcollection (using user.uid as doc ID)
+      // 3. Increment invitation usage
       await Promise.all([
         updateDoc(wsRef, { memberRoles: newRoles }),
         setDoc(doc(db, 'workspaces', invite.workspaceId, 'members', user.uid), {
@@ -135,7 +149,7 @@ export default function JoinPage() {
           workspaceId: invite.workspaceId,
           userId: user.uid,
           displayName: user.displayName || 'Anonymous',
-          email: user.email || '',
+          email: user.email?.toLowerCase() || '',
           avatarUrl: user.photoURL || null,
         }, { merge: true }),
         updateDoc(doc(db, 'invitations', inviteId as string), { usageCount: increment(1) })
@@ -151,12 +165,12 @@ export default function JoinPage() {
     }
   };
 
-  if (loading || (isUserLoading && !user)) {
+  if (loading || (isUserLoading && !user) || (user && isLoggingIn && !invite)) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Checking invitation...</p>
+          <p className="text-sm text-muted-foreground">Preparing your invitation...</p>
         </div>
       </div>
     );
@@ -164,7 +178,7 @@ export default function JoinPage() {
 
   return (
     <div className="h-screen w-full flex items-center justify-center bg-background p-4">
-      <Card className="max-w-md w-full border-none shadow-xl">
+      <Card className="max-w-md w-full border-none shadow-xl animate-in fade-in zoom-in duration-300">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
             {joined ? <CheckCircle2 className="h-8 w-8 text-green-500" /> : <Users className="h-8 w-8 text-primary" />}
@@ -176,7 +190,7 @@ export default function JoinPage() {
             <CardDescription>
               {error ? 'There was an issue with your invitation' : 
                joined ? 'Redirecting you to the dashboard...' : 
-               `You've been invited to join ${invite?.workspaceName}`}
+               invite ? `You've been invited to join ${invite.workspaceName}` : 'Checking invitation...'}
             </CardDescription>
           </div>
         </CardHeader>
@@ -188,26 +202,28 @@ export default function JoinPage() {
             </div>
           ) : !joined ? (
             <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-sm p-3 bg-muted rounded-lg">
-                  <span className="text-muted-foreground">Invited by</span>
-                  <span className="font-semibold">{invite.invitedByName}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm p-3 bg-muted rounded-lg">
-                  <span className="text-muted-foreground">Your Role</span>
-                  <div className="flex items-center gap-1.5 font-semibold capitalize">
-                    {invite.role === 'lead' ? <ShieldCheck className="h-4 w-4 text-primary" /> : <Users className="h-4 w-4" />}
-                    {invite.role}
+              {invite && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-sm p-3 bg-muted rounded-lg">
+                    <span className="text-muted-foreground">Invited by</span>
+                    <span className="font-semibold">{invite.invitedByName}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm p-3 bg-muted rounded-lg">
+                    <span className="text-muted-foreground">Your Role</span>
+                    <div className="flex items-center gap-1.5 font-semibold capitalize">
+                      {invite.role === 'lead' ? <ShieldCheck className="h-4 w-4 text-primary" /> : <Users className="h-4 w-4" />}
+                      {invite.role}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {!user ? (
                 <div className="space-y-4">
                   <p className="text-xs text-center text-muted-foreground">You must be signed in to accept this invitation.</p>
-                  <Button className="w-full gap-2 h-11" onClick={handleLogin}>
-                    <LogIn className="h-5 w-5" />
-                    Sign in with Google
+                  <Button className="w-full gap-2 h-11" onClick={handleLogin} disabled={isLoggingIn}>
+                    {isLoggingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
+                    {isLoggingIn ? 'Signing in...' : 'Sign in with Google'}
                   </Button>
                 </div>
               ) : (
@@ -219,7 +235,7 @@ export default function JoinPage() {
                       <span className="text-xs text-muted-foreground">{user.email}</span>
                     </div>
                   </div>
-                  <Button className="w-full h-11 text-lg font-semibold" onClick={handleJoin} disabled={joining}>
+                  <Button className="w-full h-11 text-lg font-semibold" onClick={handleJoin} disabled={joining || !invite}>
                     {joining ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -233,7 +249,7 @@ export default function JoinPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-4 gap-4">
                <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
-               <p className="text-sm text-muted-foreground">Success! Redirecting...</p>
+               <p className="text-sm text-muted-foreground">Success! Setting up your workspace...</p>
             </div>
           )}
           
