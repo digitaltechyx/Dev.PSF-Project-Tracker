@@ -59,11 +59,15 @@ service cloud.firestore {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isWorkspaceAdmin(workspaceId);
+      // Allow update for any signed-in user to support the client-side joining process (updating memberRoles)
+      allow update: if isSignedIn();
+      allow delete: if isWorkspaceAdmin(workspaceId);
 
       match /members/{memberUserId} {
         allow read: if isSignedIn();
-        allow write: if isWorkspaceAdmin(workspaceId);
+        // Allow users to create their own member record during join flow
+        allow create: if isSignedIn() && request.auth.uid == memberUserId;
+        allow update, delete: if isWorkspaceAdmin(workspaceId);
       }
 
       match /projects/{projectId} {
