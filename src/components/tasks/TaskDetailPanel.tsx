@@ -60,41 +60,38 @@ export function TaskDetailPanel({
     setMounted(true);
   }, []);
 
-  // Robust task lookup: Check all potential sources in the store
   const task = useMemo(() => {
     if (!taskId) return null;
-    return (
-      store.projectTasks?.find((t: any) => t.id === taskId) || 
-      store.myTasks?.find((t: any) => t.id === taskId) ||
-      store.workspaceTasks?.find((t: any) => t.id === taskId) ||
-      store.tasks?.find((t: any) => t.id === taskId)
-    );
-  }, [taskId, store.projectTasks, store.myTasks, store.workspaceTasks, store.tasks]);
+    return store.allWorkspaceTasks?.find((t: any) => t.id === taskId);
+  }, [taskId, store.allWorkspaceTasks]);
 
-  // Real-time comments listener - Using hierarchical rule, no memberRoles filter needed
   const commentsQuery = useMemoFirebase(() => {
-    if (!db || !task || !user) return null;
+    if (!db || !task) return null;
     return query(
       collection(db, 'workspaces', task.workspaceId, 'projects', task.projectId, 'tasks', task.id, 'comments'),
       orderBy('createdAt', 'asc')
     );
-  }, [db, task, user]);
+  }, [db, task]);
   
   const { data: commentsData } = useCollection(commentsQuery);
   const comments = useMemo(() => commentsData || [], [commentsData]);
 
   if (!task) return null;
 
+  const isAdmin = store.isAdmin;
+
   const handleUpdate = (field: string, value: any) => {
+    if (!isAdmin) return;
     store.updateTask(taskId, { [field]: value });
   };
 
   const handleGenerateDescription = async () => {
+    if (!isAdmin) return;
     setIsGeneratingDesc(true);
     try {
       const result = await generateTaskDescription({ taskTitle: task.title });
       handleUpdate('description', result.taskDescription);
-      toast({ title: 'AI Description Generated', description: 'Task description has been updated.' });
+      toast({ title: 'AI Description Generated' });
     } catch (error) {
       console.error(error);
     } finally {
@@ -103,12 +100,13 @@ export function TaskDetailPanel({
   };
 
   const handleSuggestAttributes = async () => {
+    if (!isAdmin) return;
     setIsSuggestingAttrs(true);
     try {
       const result = await suggestTaskAttributes({ title: task.title, description: task.description });
       handleUpdate('priority', result.priority);
       handleUpdate('tags', result.tags);
-      toast({ title: 'AI Attributes Suggested', description: 'Priority and tags have been optimized.' });
+      toast({ title: 'AI Attributes Suggested' });
     } catch (error) {
       console.error(error);
     } finally {
@@ -117,6 +115,7 @@ export function TaskDetailPanel({
   };
 
   const handleDelete = () => {
+    if (!isAdmin) return;
     store.deleteTask(taskId);
     onClose();
   };
@@ -139,15 +138,18 @@ export function TaskDetailPanel({
               </Badge>
             </SheetTitle>
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive h-8 w-8">
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive h-8 w-8">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
           <Input 
             className="text-2xl font-bold border-none px-0 shadow-none focus-visible:ring-0 font-headline"
             value={task.title}
             onChange={(e) => handleUpdate('title', e.target.value)}
+            disabled={!isAdmin}
           />
         </SheetHeader>
 
@@ -155,7 +157,7 @@ export function TaskDetailPanel({
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight">Status</Label>
-              <Select value={task.status} onValueChange={(val) => handleUpdate('status', val)}>
+              <Select value={task.status} onValueChange={(val) => handleUpdate('status', val)} disabled={!isAdmin}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -169,17 +171,19 @@ export function TaskDetailPanel({
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight">Priority</Label>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-5 w-5 text-primary" 
-                  onClick={handleSuggestAttributes}
-                  disabled={isSuggestingAttrs}
-                >
-                  {isSuggestingAttrs ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-5 w-5 text-primary" 
+                    onClick={handleSuggestAttributes}
+                    disabled={isSuggestingAttrs}
+                  >
+                    {isSuggestingAttrs ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  </Button>
+                )}
               </div>
-              <Select value={task.priority} onValueChange={(val) => handleUpdate('priority', val)}>
+              <Select value={task.priority} onValueChange={(val) => handleUpdate('priority', val)} disabled={!isAdmin}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -200,12 +204,13 @@ export function TaskDetailPanel({
                   className="pl-9 h-9" 
                   value={task.dueDate ? task.dueDate.split('T')[0] : ''}
                   onChange={(e) => handleUpdate('dueDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  disabled={!isAdmin}
                 />
               </div>
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight">Assignee</Label>
-              <Select value={task.assigneeUserId || 'unassigned'} onValueChange={(val) => handleUpdate('assigneeUserId', val === 'unassigned' ? null : val)}>
+              <Select value={task.assigneeUserId || 'unassigned'} onValueChange={(val) => handleUpdate('assigneeUserId', val === 'unassigned' ? null : val)} disabled={!isAdmin}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
@@ -229,45 +234,52 @@ export function TaskDetailPanel({
 
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight flex items-center gap-1.5">
+              <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight">
                 Description
               </Label>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-7 text-[10px] gap-1.5 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"
-                onClick={handleGenerateDescription}
-                disabled={isGeneratingDesc}
-              >
-                {isGeneratingDesc ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                AI Generate
-              </Button>
+              {isAdmin && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 text-[10px] gap-1.5"
+                  onClick={handleGenerateDescription}
+                  disabled={isGeneratingDesc}
+                >
+                  {isGeneratingDesc ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  AI Generate
+                </Button>
+              )}
             </div>
             <Textarea 
               placeholder="Add details about this task..."
               className="min-h-[120px] leading-relaxed resize-none"
               value={task.description}
               onChange={(e) => handleUpdate('description', e.target.value)}
+              disabled={!isAdmin}
             />
           </div>
 
           <div className="space-y-4">
-            <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground uppercase font-bold tracking-tight">
               Tags
             </Label>
             <div className="flex flex-wrap gap-2">
               {task.tags?.map((tag: string) => (
                 <Badge key={tag} variant="secondary" className="gap-1 px-2 py-1">
                   {tag}
-                  <X 
-                    className="h-3 w-3 cursor-pointer hover:text-destructive" 
-                    onClick={() => handleUpdate('tags', task.tags.filter((t: string) => t !== tag))}
-                  />
+                  {isAdmin && (
+                    <X 
+                      className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                      onClick={() => handleUpdate('tags', task.tags.filter((t: string) => t !== tag))}
+                    />
+                  )}
                 </Badge>
               ))}
-              <Button variant="ghost" size="sm" className="h-7 px-2 border border-dashed rounded-full text-xs">
-                <Plus className="h-3 w-3 mr-1" /> Add Tag
-              </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="sm" className="h-7 px-2 border border-dashed rounded-full text-xs">
+                  <Plus className="h-3 w-3 mr-1" /> Add Tag
+                </Button>
+              )}
             </div>
           </div>
 
@@ -302,11 +314,6 @@ export function TaskDetailPanel({
                   </div>
                 );
               })}
-              {comments.length === 0 && (
-                <div className="text-center py-6 text-sm text-muted-foreground italic">
-                  No comments yet. Start the conversation!
-                </div>
-              )}
             </div>
 
             <div className="flex items-start gap-3 pt-2">
@@ -320,12 +327,6 @@ export function TaskDetailPanel({
                   className="min-h-[80px] text-sm"
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handlePostComment();
-                    }
-                  }}
                 />
                 <div className="flex justify-end">
                   <Button 

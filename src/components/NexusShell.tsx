@@ -10,8 +10,7 @@ import {
   Box,
   ListTodo,
   Bell,
-  LogOut,
-  UserPlus
+  LogOut
 } from 'lucide-react';
 import { useNexusStore } from '@/hooks/use-nexus-store';
 import { useAuth } from '@/firebase';
@@ -83,14 +82,20 @@ export function NexusShell() {
     }
   };
 
+  const handleCreateProject = () => {
+    if (newProjName) {
+      store.createProject(newProjName, newProjDesc);
+      setNewProjName('');
+      setNewProjDesc('');
+      setIsProjDialogOpen(false);
+    }
+  };
+
   const handleLogout = () => {
     auth.signOut();
   };
 
   if (!mounted || !store.currentUser) return <div className="h-screen w-full bg-background" />;
-
-  const isAdmin = store.activeWorkspace?.ownerUserId === store.currentUser.id || 
-                  (store.activeWorkspace?.memberRoles?.[store.currentUser.id] === 'admin');
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
@@ -125,11 +130,6 @@ export function NexusShell() {
                   </div>
                 </DropdownMenuItem>
               ))}
-              {store.workspaces?.length === 0 && (
-                <div className="px-2 py-4 text-center text-xs text-muted-foreground italic">
-                  No workspaces yet
-                </div>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button 
@@ -181,14 +181,16 @@ export function NexusShell() {
           <div className="space-y-4">
             <div className="flex items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Projects
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-5 w-5 hover:bg-muted" 
-                onClick={() => setIsProjDialogOpen(true)}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
+              {store.isAdmin && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-5 w-5 hover:bg-muted" 
+                  onClick={() => setIsProjDialogOpen(true)}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              )}
             </div>
             <div className="space-y-1">
               {store.workspaceProjects?.map(p => (
@@ -215,7 +217,7 @@ export function NexusShell() {
               </Avatar>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm font-semibold truncate">{store.currentUser.name}</span>
-                <span className="text-xs text-muted-foreground truncate">{store.currentUser.email}</span>
+                <span className="text-xs text-muted-foreground truncate uppercase">{store.currentRole}</span>
               </div>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleLogout}>
@@ -257,7 +259,7 @@ export function NexusShell() {
             <MembersView 
               store={store} 
               onInviteClick={() => setIsInviteOpen(true)} 
-              isAdmin={isAdmin}
+              isAdmin={store.isOwner}
             />
           )}
           {currentView === 'my-tasks' && <MyTasksView store={store} />}
@@ -285,6 +287,29 @@ export function NexusShell() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsWsDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateWorkspace}>Create Workspace</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isProjDialogOpen} onOpenChange={setIsProjDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>Add a project to this workspace.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="proj-name">Project Name</Label>
+              <Input id="proj-name" value={newProjName} onChange={(e) => setNewProjName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="proj-desc">Description</Label>
+              <Textarea id="proj-desc" value={newProjDesc} onChange={(e) => setNewProjDesc(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsProjDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateProject}>Create Project</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -36,11 +36,13 @@ const statusIcons: Record<Status, React.ReactNode> = {
 export function TaskList({ 
   tasks, 
   onTaskClick, 
-  updateTask 
+  updateTask,
+  readOnly = false
 }: { 
   tasks: Task[], 
   onTaskClick: (id: string) => void,
-  updateTask: any
+  updateTask: any,
+  readOnly?: boolean
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -71,6 +73,7 @@ export function TaskList({
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <Checkbox 
                   checked={task.status === 'done'} 
+                  disabled={readOnly}
                   onCheckedChange={(checked) => {
                     updateTask(task.id, { status: checked ? 'done' : 'todo' });
                   }}
@@ -116,13 +119,6 @@ export function TaskList({
               </TableCell>
             </TableRow>
           ))}
-          {tasks.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                No tasks match your criteria.
-              </TableCell>
-            </TableRow>
-          )}
         </TableBody>
       </Table>
     </div>

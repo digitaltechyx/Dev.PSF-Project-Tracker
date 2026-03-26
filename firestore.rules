@@ -6,12 +6,23 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function getWorkspace(wsId) {
       return get(/databases/$(database)/documents/workspaces/$(wsId)).data;
+    }
+
+    function isWorkspaceOwner(wsId) {
+      let ws = getWorkspace(wsId);
+      return isSignedIn() && ws.ownerUserId == request.auth.uid;
+    }
+
+    function isWorkspaceAdmin(wsId) {
+      let ws = getWorkspace(wsId);
+      let role = ws.memberRoles[request.auth.uid];
+      return isSignedIn() && (
+        ws.ownerUserId == request.auth.uid || 
+        role == 'lead' || 
+        role == 'owner'
+      );
     }
 
     function isWorkspaceMember(wsId) {
@@ -19,14 +30,6 @@ service cloud.firestore {
       return isSignedIn() && (
         ws.ownerUserId == request.auth.uid || 
         (ws.memberRoles != null && ws.memberRoles[request.auth.uid] != null)
-      );
-    }
-
-    function isWorkspaceAdmin(wsId) {
-      let ws = getWorkspace(wsId);
-      return isSignedIn() && (
-        ws.ownerUserId == request.auth.uid || 
-        (ws.memberRoles != null && (ws.memberRoles[request.auth.uid] == 'lead' || ws.memberRoles[request.auth.uid] == 'owner'))
       );
     }
 
@@ -45,41 +48,43 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn() && request.query.limit <= 5;
-      allow create, update: if isOwner(userId);
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
     }
 
     match /invitations/{inviteId} {
       allow get: if true;
-      allow list: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
-      allow create: if isSignedIn() && isWorkspaceAdmin(request.resource.data.workspaceId);
-      allow update, delete: if isSignedIn() && isWorkspaceAdmin(resource.data.workspaceId);
+      allow list: if isSignedIn() && isWorkspaceOwner(resource.data.workspaceId);
+      allow create: if isSignedIn() && isWorkspaceOwner(request.resource.data.workspaceId);
+      allow update, delete: if isSignedIn() && isWorkspaceOwner(resource.data.workspaceId);
     }
 
     match /workspaces/{workspaceId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isSignedIn();
-      // Allow update for any signed-in user to support the client-side joining process
+      // Only owner can delete workspace
+      allow delete: if isWorkspaceOwner(workspaceId);
+      // Allow update for joining and role management (managed by owner)
       allow update: if isSignedIn();
-      allow delete: if isWorkspaceAdmin(workspaceId);
 
       match /members/{memberUserId} {
         allow read: if isSignedIn();
-        // Allow users to create their own member record OR admins to add them directly
-        allow create: if (isSignedIn() && request.auth.uid == memberUserId) || isWorkspaceAdmin(workspaceId);
-        allow update, delete: if isWorkspaceAdmin(workspaceId);
+        // Allow users to join themselves, or owners to add them
+        allow create: if (isSignedIn() && request.auth.uid == memberUserId) || isWorkspaceOwner(workspaceId);
+        // Only owner can manage members
+        allow update, delete: if isWorkspaceOwner(workspaceId);
       }
 
       match /projects/{projectId} {
-        allow read: if isSignedIn();
+        allow read: if isWorkspaceMember(workspaceId);
         allow write: if isWorkspaceAdmin(workspaceId);
 
         match /tasks/{taskId} {
-          allow read: if isSignedIn();
-          allow write: if isWorkspaceMember(workspaceId);
+          allow read: if isWorkspaceMember(workspaceId);
+          allow write: if isWorkspaceAdmin(workspaceId);
 
           match /comments/{commentId} {
-            allow read: if isSignedIn();
+            allow read: if isWorkspaceMember(workspaceId);
             allow write: if isWorkspaceMember(workspaceId);
           }
         }
