@@ -242,7 +242,7 @@ export function NexusShell() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            {currentView !== 'dashboard' && currentView !== 'notifications' && (
+            {currentView !== 'dashboard' && currentView !== 'notifications' && currentView !== 'members' && (
               <div className="relative w-64 animate-in fade-in duration-300">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
