@@ -49,11 +49,13 @@ export function InviteMembersModal({
   const [copying, setCopying] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   
-  // Link State
+  // Selection State (Shared between tabs)
   const [role, setRole] = useState<'member' | 'lead'>('member');
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+
+  // Link State
   const [expires, setExpires] = useState<string>('7');
   const [maxUses, setMaxUses] = useState<string>('unlimited');
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Search State
@@ -111,14 +113,50 @@ export function InviteMembersModal({
 
   const handleAddDirect = async (user: any, targetRole: 'member' | 'lead') => {
     try {
-      await store.directAddMember(user, targetRole);
-      toast({ title: 'Member added!', description: `${user.name || user.email} is now a ${targetRole}.` });
+      await store.directAddMember(user, targetRole, selectedProjects);
+      toast({ 
+        title: 'Member added!', 
+        description: `${user.name || user.email} is now a ${targetRole}${selectedProjects.length > 0 ? ` with access to ${selectedProjects.length} projects` : ''}.` 
+      });
       setSearchResults([]);
       setSearchEmail('');
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
   };
+
+  const ProjectSelection = () => (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5">
+        <Box className="h-3 w-3" /> Target Projects (Optional)
+      </Label>
+      <p className="text-[10px] text-muted-foreground pb-2">If role is Member, they will only see these projects.</p>
+      <ScrollArea className="h-[120px] rounded-md border p-2">
+        <div className="space-y-2">
+          {store.workspaceProjects.map((p: any) => (
+            <div key={p.id} className="flex items-center space-x-2">
+              <Checkbox 
+                id={`proj-${p.id}`} 
+                checked={selectedProjects.includes(p.id)} 
+                onCheckedChange={() => handleToggleProject(p.id)}
+              />
+              <label 
+                htmlFor={`proj-${p.id}`} 
+                className="text-xs font-medium leading-none cursor-pointer"
+              >
+                {p.name}
+              </label>
+            </div>
+          ))}
+          {store.workspaceProjects.length === 0 && (
+            <div className="text-[10px] text-center py-4 text-muted-foreground italic">
+              No projects in this workspace yet
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 
   const copyLink = () => {
     if (inviteLink) {
@@ -186,31 +224,7 @@ export function InviteMembersModal({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5">
-                    <Box className="h-3 w-3" /> Target Projects (Optional)
-                  </Label>
-                  <p className="text-[10px] text-muted-foreground pb-2">If role is Member, they will only see these projects.</p>
-                  <ScrollArea className="h-[120px] rounded-md border p-2">
-                    <div className="space-y-2">
-                      {store.workspaceProjects.map((p: any) => (
-                        <div key={p.id} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`proj-${p.id}`} 
-                            checked={selectedProjects.includes(p.id)} 
-                            onCheckedChange={() => handleToggleProject(p.id)}
-                          />
-                          <label 
-                            htmlFor={`proj-${p.id}`} 
-                            className="text-xs font-medium leading-none cursor-pointer"
-                          >
-                            {p.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
+                <ProjectSelection />
 
                 <div className="space-y-2">
                   <Label>Max Uses</Label>
@@ -250,68 +264,73 @@ export function InviteMembersModal({
           </TabsContent>
 
           <TabsContent value="email" className="space-y-6 py-4">
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Type an email to search..." 
-                  className="pl-9" 
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                />
-              </div>
+            <div className="space-y-6">
+              <ProjectSelection />
+              
+              <div className="space-y-4">
+                <Label>Search Members</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Type an email to search..." 
+                    className="pl-9" 
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                  />
+                </div>
 
-              <div className="space-y-3 max-h-[300px] overflow-y-auto min-h-[100px]">
-                {isSearching && (
-                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="text-sm">Searching...</span>
-                  </div>
-                )}
-                
-                {!isSearching && searchResults.map(user => {
-                  const isAlreadyMember = store.activeWorkspace?.memberRoles?.[user.id] !== undefined;
-                  return (
-                    <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={user.avatarUrl} />
-                          <AvatarFallback>{user.name?.charAt(0) || '?'}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold">{user.name || 'User'}</span>
-                          <span className="text-xs text-muted-foreground">{user.email}</span>
+                <div className="space-y-3 max-h-[250px] overflow-y-auto min-h-[100px]">
+                  {isSearching && (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="text-sm">Searching...</span>
+                    </div>
+                  )}
+                  
+                  {!isSearching && searchResults.map(user => {
+                    const isAlreadyMember = store.activeWorkspace?.memberRoles?.[user.id] !== undefined;
+                    return (
+                      <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={user.avatarUrl} />
+                            <AvatarFallback>{user.name?.charAt(0) || '?'}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold">{user.name || 'User'}</span>
+                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {isAlreadyMember ? (
+                            <Badge variant="secondary">Member</Badge>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'member')}>
+                                Add Member
+                              </Button>
+                              <Button size="sm" variant="secondary" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'lead')}>
+                                Add Lead
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        {isAlreadyMember ? (
-                          <Badge variant="secondary">Member</Badge>
-                        ) : (
-                          <>
-                            <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'member')}>
-                              Add Member
-                            </Button>
-                            <Button size="sm" variant="secondary" className="h-8 px-2 text-[10px]" onClick={() => handleAddDirect(user, 'lead')}>
-                              Add Lead
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
 
-                {!isSearching && searchResults.length === 0 && searchEmail.length >= 2 && (
-                  <div className="text-center py-6 text-muted-foreground text-sm border border-dashed rounded-lg">
-                    No results for "{searchEmail}"
-                  </div>
-                )}
-                
-                {!isSearching && searchEmail.length < 2 && (
-                  <div className="text-center py-6 text-muted-foreground text-xs italic">
-                    Type at least 2 characters to search
-                  </div>
-                )}
+                  {!isSearching && searchResults.length === 0 && searchEmail.length >= 2 && (
+                    <div className="text-center py-6 text-muted-foreground text-sm border border-dashed rounded-lg">
+                      No results for "{searchEmail}"
+                    </div>
+                  )}
+                  
+                  {!isSearching && searchEmail.length < 2 && (
+                    <div className="text-center py-6 text-muted-foreground text-xs italic">
+                      Type at least 2 characters to search
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </TabsContent>

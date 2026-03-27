@@ -290,16 +290,18 @@ export function useNexusStore() {
     }
   }, [db]);
 
-  const directAddMember = useCallback(async (targetUser: any, role: 'member' | 'lead') => {
+  const directAddMember = useCallback(async (targetUser: any, role: 'member' | 'lead', targetProjectIds?: string[]) => {
     const wsId = activeWorkspace?.id;
     if (!db || !wsId || !isAdmin || !targetUser) return;
     
+    // 1. Add to workspace roles
     const wsRef = doc(db, 'workspaces', wsId);
     await updateDocumentNonBlocking(wsRef, {
       [`memberRoles.${targetUser.id}`]: role,
       updatedAt: new Date().toISOString()
     });
 
+    // 2. Create workspace member profile
     const memberRef = doc(db, 'workspaces', wsId, 'members', targetUser.id);
     await setDocumentNonBlocking(memberRef, {
       id: targetUser.id,
@@ -309,6 +311,22 @@ export function useNexusStore() {
       email: targetUser.email?.toLowerCase() || '',
       avatarUrl: targetUser.avatarUrl || null,
     }, { merge: true });
+
+    // 3. Grant access to selected projects
+    if (targetProjectIds && targetProjectIds.length > 0) {
+      for (const projId of targetProjectIds) {
+        const projRef = doc(db, 'workspaces', wsId, 'projects', projId);
+        const projSnap = await getDoc(projRef);
+        if (projSnap.exists()) {
+          const currentAllowed = projSnap.data().allowedUserIds || [];
+          if (!currentAllowed.includes(targetUser.id)) {
+            await updateDocumentNonBlocking(projRef, {
+              allowedUserIds: [...currentAllowed, targetUser.id]
+            });
+          }
+        }
+      }
+    }
   }, [db, activeWorkspace, isAdmin]);
 
   const createProject = useCallback(async (wsId: string, name: string, description: string) => {
