@@ -7,16 +7,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // --- NOTIFICATIONS RULES ---
+    // --- NOTIFICATIONS RULES (FIXED) ---
     match /notifications/{notificationId} {
-      // For reading (both get and list)
-      // List queries MUST filter by userId matching the authenticated UID.
+      // Read: user can only read their own notifications
+      // For LIST queries: Firestore will verify the query includes userId filter
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       
-      // Allow any authenticated user to create a notification for another user
-      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      // Create: actor must be the authenticated user
+      allow create: if isSignedIn() && 
+                    request.resource.data.actorId == request.auth.uid &&
+                    request.resource.data.userId is string;
       
-      // Only the recipient can update (mark as read) or delete their notifications
+      // Update/Delete: only the recipient can do this
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
@@ -63,6 +65,13 @@ service cloud.firestore {
           }
         }
       }
+    }
+    
+    // --- INVITATIONS ---
+    match /invitations/{invitationId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
     }
   }
 }
