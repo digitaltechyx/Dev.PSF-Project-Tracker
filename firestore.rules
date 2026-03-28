@@ -8,16 +8,18 @@ service cloud.firestore {
     }
 
     // --- NOTIFICATIONS RULES ---
+    // These rules are placed at the top level to ensure clear evaluation.
     match /notifications/{notificationId} {
       // Users can only read notifications where they are the recipient.
-      // Collection queries MUST include a filter: where("userId", "==", request.auth.uid)
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // The Firestore engine requires collection queries to have a matching filter: where("userId", "==", request.auth.uid)
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       
-      // Any signed-in user can create a notification for someone else.
-      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      // Any signed-in user can create a notification for someone else (the 'userId' recipient).
+      // We validate that the 'actorId' matches the sender to prevent impersonation.
+      allow create: if request.auth != null && request.resource.data.actorId == request.auth.uid;
       
-      // Users can only update/delete their own notifications (e.g., mark as read).
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Users can only update or delete their own notifications.
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // --- COLLECTION GROUP RULES ---
