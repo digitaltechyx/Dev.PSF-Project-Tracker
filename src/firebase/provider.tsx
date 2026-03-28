@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -58,6 +59,7 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
 
 /**
  * FirebaseProvider manages and provides Firebase services and user authentication state.
+ * It does NOT handle any data-fetching listeners for collections like notifications.
  */
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
@@ -103,7 +105,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             setUserAuthState({ user: firebaseUser, isUserLoading: false, isAuthReady: true, userError: null });
           } catch (error: any) {
             console.error("FirebaseProvider: User doc sync error:", error);
-            // Still set ready to true to prevent blocking the app entirely on non-critical errors
             setUserAuthState({ user: firebaseUser, isUserLoading: false, isAuthReady: true, userError: null });
           }
         } else {
@@ -143,7 +144,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
 /**
  * Hook to access core Firebase services and user authentication state.
- * Throws error if core services are not available or used outside provider.
  */
 export const useFirebase = (): FirebaseServicesAndUser => {
   const context = useContext(FirebaseContext);
@@ -198,8 +198,6 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
 
 /**
  * Hook specifically for accessing the authenticated user's state.
- * This provides the User object, loading status, and any auth errors.
- * @returns {UserHookResult} Object with user, isUserLoading, userError.
  */
 export const useUser = (): UserHookResult => {
   const { user, isUserLoading, isAuthReady, userError } = useFirebase();

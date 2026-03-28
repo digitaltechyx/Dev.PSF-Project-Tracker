@@ -16,7 +16,7 @@ export function useNotifications(max: number = 50) {
 
   const notificationsQuery = useMemoFirebase(() => {
     // CRITICAL: We only construct the query if the user is fully authenticated and ready.
-    // The query MUST include the 'userId' filter to satisfy the 'read' security rule.
+    // The query MUST include the 'userId' filter to satisfy the security rules.
     if (!db || !isAuthReady || !user?.uid) {
       return null;
     }

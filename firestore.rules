@@ -9,9 +9,8 @@ service cloud.firestore {
 
     // --- NOTIFICATIONS RULES ---
     match /notifications/{notificationId} {
-      // Standard pattern for user-owned data:
-      // This covers both 'get' (single doc) and 'list' (collection queries).
-      // For 'list', the client must filter by userId == auth.uid.
+      // Users can only read notifications where they are the recipient.
+      // The 'userId' filter in the client-side query MUST match the auth.uid.
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       
       // Allow any authenticated user to create a notification for another user
