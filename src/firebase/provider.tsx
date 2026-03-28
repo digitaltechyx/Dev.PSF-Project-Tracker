@@ -59,7 +59,7 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
 
 /**
  * FirebaseProvider manages and provides Firebase services and user authentication state.
- * It does NOT handle any data-fetching listeners for collections like notifications.
+ * It is a clean service provider and does NOT handle data-fetching listeners like notifications.
  */
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
@@ -104,6 +104,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             
             setUserAuthState({ user: firebaseUser, isUserLoading: false, isAuthReady: true, userError: null });
           } catch (error: any) {
+            // Even if doc creation fails (e.g. offline), we consider auth ready if the user exists
             setUserAuthState({ user: firebaseUser, isUserLoading: false, isAuthReady: true, userError: null });
           }
         } else {
@@ -185,6 +186,9 @@ export const useFirebaseApp = (): FirebaseApp => {
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 
+/**
+ * Utility to memoize Firebase references and queries for use with hooks.
+ */
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
   const memoized = useMemo(factory, deps);
   

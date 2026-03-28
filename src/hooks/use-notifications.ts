@@ -14,7 +14,21 @@ export function useNotifications(max: number = 50) {
   const db = useFirestore();
   const { user, isAuthReady } = useUser();
 
+  // Debug: Monitor authentication state and user details
+  console.log('[useNotifications] Debug:', {
+    hasDb: !!db,
+    isAuthReady,
+    userId: user?.uid || 'NO USER',
+    userEmail: user?.email || 'NO EMAIL'
+  });
+
   const notificationsQuery = useMemoFirebase(() => {
+    // Debug: Monitor query building logic
+    console.log('[useNotifications] Building query:', {
+      willReturnNull: !db || !isAuthReady || !user?.uid,
+      userId: user?.uid
+    });
+
     // CRITICAL: We only construct the query if the user is fully authenticated and ready.
     // The query MUST include the 'userId' filter to satisfy the security rules.
     if (!db || !isAuthReady || !user?.uid) {
