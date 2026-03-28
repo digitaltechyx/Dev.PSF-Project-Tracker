@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -60,7 +61,6 @@ export function useCollection<T = any>(
     }
 
     // Determine the path for the query. 
-    // For CollectionGroup, the path is often empty or root-level.
     const isCollectionGroup = !('path' in memoizedTargetRefOrQuery) || !memoizedTargetRefOrQuery.type || memoizedTargetRefOrQuery.type === undefined;
     const path: string =
       memoizedTargetRefOrQuery.type === 'collection'
@@ -68,7 +68,6 @@ export function useCollection<T = any>(
         : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
 
     // Safety check: Only block if it's a COLLECTION reference at the root. 
-    // CollectionGroup queries at the root are intended.
     if (!isCollectionGroup && (path === "/" || path === "" || path.includes('/databases/(default)/documents/'))) {
       console.warn("useCollection: Refusing to execute a collection query on the root or empty path.");
       setData(null);
@@ -91,6 +90,7 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        // Construct the rich, contextual permission error.
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: path || 'collectionGroup',
@@ -100,6 +100,7 @@ export function useCollection<T = any>(
         setData(null);
         setIsLoading(false);
 
+        // Global propagation for agentive error fixing loops
         errorEmitter.emit('permission-error', contextualError);
       }
     );
