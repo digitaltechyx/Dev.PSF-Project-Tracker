@@ -307,8 +307,6 @@ export function useNexusStore() {
     async (params: {
       recipientEmail: string;
       role: 'member' | 'lead';
-      expiresDays: number | 'never';
-      maxUses: number | 'unlimited';
       targetProjectIds: string[];
       joinUrl: string;
     }) => {
@@ -323,10 +321,8 @@ export function useNexusStore() {
       }
 
       const inviteRef = doc(collection(db, 'invitations'));
-      const expiresAt =
-        params.expiresDays === 'never'
-          ? null
-          : new Date(Date.now() + params.expiresDays * 86400000).toISOString();
+      const expiresAt = null;
+      const maxUses: 'unlimited' = 'unlimited';
 
       const inviteData: Invitation = {
         id: inviteRef.id,
@@ -338,8 +334,9 @@ export function useNexusStore() {
         type: 'email',
         status: 'active',
         usageCount: 0,
-        maxUses: params.maxUses === 'unlimited' ? 'unlimited' : params.maxUses,
-        targetProjectIds: params.targetProjectIds,
+        maxUses,
+        // If none selected: member invites should grant access to all workspace projects on join.
+        targetProjectIds: params.targetProjectIds.length > 0 ? params.targetProjectIds : undefined,
         createdAt: new Date().toISOString(),
         expiresAt,
         invitedEmail: normalized,

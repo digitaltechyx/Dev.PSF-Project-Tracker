@@ -14,6 +14,8 @@ import {
 import { 
   doc, 
   getDoc, 
+  collection,
+  getDocs,
   updateDoc, 
   increment, 
   setDoc, 
@@ -167,6 +169,12 @@ export default function JoinWorkspacePage() {
       const workspaceData = workspaceSnap.data();
       const isAlreadyMember = workspaceData.memberRoles?.[user.uid];
 
+      const isEmailInvite = invitation.type === 'email';
+      const grantAllProjectsForMember =
+        isEmailInvite &&
+        invitation.role === 'member' &&
+        (!invitation.targetProjectIds || invitation.targetProjectIds.length === 0);
+
       if (!isAlreadyMember) {
         // 1. Update Workspace Roles
         await updateDoc(workspaceRef, {
@@ -188,18 +196,24 @@ export default function JoinWorkspacePage() {
           email: user.email?.toLowerCase() || '',
           avatarUrl: user.photoURL || null,
         }, { merge: true });
+      }
 
-        // 4. Grant access to target projects (Project-level scoping)
-        if (invitation.targetProjectIds && invitation.targetProjectIds.length > 0) {
-          for (const projId of invitation.targetProjectIds) {
-            const projRef = doc(db, 'workspaces', invitation.workspaceId, 'projects', projId);
-            const projSnap = await getDoc(projRef);
-            if (projSnap.exists()) {
-              const projData = projSnap.data();
-              const allowedIds = [...(projData.allowedUserIds || []), user.uid];
-              await updateDoc(projRef, { allowedUserIds: Array.from(new Set(allowedIds)) });
-            }
-          }
+      // 4. Grant access to projects (project-level scoping)
+      // Email invites:
+      // - member + no project selection => grant ALL workspace projects
+      // - member + specific selections => grant only those projects
+      if (invitation.role === 'member' && isEmailInvite) {
+        const projectIds = grantAllProjectsForMember
+          ? (await getDocs(collection(db, 'workspaces', invitation.workspaceId, 'projects'))).docs.map((d) => d.id)
+          : (invitation.targetProjectIds || []);
+
+        for (const projId of projectIds) {
+          const projRef = doc(db, 'workspaces', invitation.workspaceId, 'projects', projId);
+          const projSnap = await getDoc(projRef);
+          if (!projSnap.exists()) continue;
+          const projData = projSnap.data();
+          const allowedIds = [...(projData.allowedUserIds || []), user.uid];
+          await updateDoc(projRef, { allowedUserIds: Array.from(new Set(allowedIds)) });
         }
       }
 

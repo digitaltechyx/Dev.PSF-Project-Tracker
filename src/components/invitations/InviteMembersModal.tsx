@@ -50,8 +50,6 @@ export function InviteMembersModal({
 
   // Email invite
   const [inviteEmail, setInviteEmail] = useState('');
-  const [expires, setExpires] = useState<string>('7');
-  const [maxUses, setMaxUses] = useState<string>('unlimited');
   const [isSending, setIsSending] = useState(false);
 
   // Search State
@@ -88,8 +86,6 @@ export function InviteMembersModal({
       await store.sendEmailInvite({
         recipientEmail: inviteEmail,
         role,
-        expiresDays: expires === 'never' ? 'never' : parseInt(expires, 10),
-        maxUses: maxUses === 'unlimited' ? 'unlimited' : parseInt(maxUses, 10),
         targetProjectIds: selectedProjects,
         joinUrl: typeof window !== 'undefined' ? window.location.origin : '',
       });
@@ -130,7 +126,10 @@ export function InviteMembersModal({
       <Label className="flex items-center gap-1.5">
         <Box className="h-3 w-3" /> Target Projects (Optional)
       </Label>
-      <p className="text-[10px] text-muted-foreground pb-2">If role is Member, they will only see these projects.</p>
+      <p className="text-[10px] text-muted-foreground pb-2">
+        If role is Member and you select projects, access is limited to those projects.
+        If none selected, they get access to all workspace projects.
+      </p>
       <ScrollArea className="h-[120px] rounded-md border p-2">
         <div className="space-y-2">
           {store.workspaceProjects.map((p: any) => (
@@ -200,7 +199,7 @@ export function InviteMembersModal({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label>Assign Role</Label>
                   <Select value={role} onValueChange={(v: any) => setRole(v)}>
@@ -213,38 +212,10 @@ export function InviteMembersModal({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Expires In</Label>
-                  <Select value={expires} onValueChange={setExpires}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 Day</SelectItem>
-                      <SelectItem value="7">7 Days</SelectItem>
-                      <SelectItem value="30">30 Days</SelectItem>
-                      <SelectItem value="never">Never</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               <ProjectSelection />
 
-              <div className="space-y-2">
-                <Label>Max Uses</Label>
-                <Select value={maxUses} onValueChange={setMaxUses}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 Use</SelectItem>
-                    <SelectItem value="5">5 Uses</SelectItem>
-                    <SelectItem value="25">25 Uses</SelectItem>
-                    <SelectItem value="unlimited">Unlimited</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <Button 
                 className="w-full" 
                 onClick={handleSendEmailInvite} 

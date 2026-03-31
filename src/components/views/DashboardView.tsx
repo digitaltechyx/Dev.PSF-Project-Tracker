@@ -52,8 +52,8 @@ export function DashboardView({ store, onNavigateToProject }: { store: any, onNa
   if (isTasksLoading && !allWorkspaceTasks.length) {
     return (
       <div className="space-y-8 animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map(i => (
             <Card key={i} className="border-none shadow-sm">
               <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
               <CardContent><Skeleton className="h-8 w-12" /></CardContent>
@@ -70,7 +70,7 @@ export function DashboardView({ store, onNavigateToProject }: { store: any, onNa
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="bg-card shadow-sm border-none">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Projects</CardTitle>
@@ -102,8 +102,18 @@ export function DashboardView({ store, onNavigateToProject }: { store: any, onNa
             <CalendarDays className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.todo + stats.inProgress + stats.onHold}</div>
+            <div className="text-2xl font-bold">{stats.todo + stats.inProgress}</div>
             <p className="text-xs text-muted-foreground mt-1">Needs attention</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card shadow-sm border-none">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">On Hold Tasks</CardTitle>
+            <PauseCircle className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.onHold}</div>
+            <p className="text-xs text-muted-foreground mt-1">Paused items</p>
           </CardContent>
         </Card>
         <Card className="bg-card shadow-sm border-none">
